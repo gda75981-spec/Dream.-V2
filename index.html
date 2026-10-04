@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Rig 7 — Sleep Equipment Test</title>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#cfd6c6;--dim:#7d8a80;--amber:#c9a24a;--blood:#a3312a;--d:0}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#050807;color:var(--ink);font-family:'Special Elite','Courier New',monospace;overflow:hidden;touch-action:none}
+canvas{display:block;position:fixed;inset:0}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 40%,rgba(60,0,0,calc(var(--d)*.5)) 100%);z-index:3}
+#hud{position:fixed;top:10px;left:12px;font-size:.85rem;z-index:4;text-shadow:0 0 4px #000;pointer-events:none}
+#bar{width:110px;height:5px;background:#1a2320;margin-top:5px}#bar i{display:block;height:100%;background:var(--amber);width:100%}
+#prompt{position:fixed;bottom:84px;width:100%;text-align:center;color:var(--amber);z-index:4;pointer-events:none}
+#msg{position:fixed;top:22%;left:50%;transform:translateX(-50%);width:min(560px,90%);text-align:center;z-index:4;opacity:0;transition:opacity .6s;text-shadow:0 0 6px #000;pointer-events:none}
+#msg.on{opacity:1}
+#tools{position:fixed;right:10px;top:8px;display:flex;gap:6px;z-index:6}
+.b{font:inherit;color:var(--ink);background:#101816cc;border:1px solid #2c3a35;padding:8px 12px;border-radius:2px;cursor:pointer}
+.b:focus-visible,.b:hover{border-color:var(--amber);outline:none}
+#pad{position:fixed;right:12px;bottom:14px;display:flex;gap:8px;z-index:6}
+#pad .b{padding:16px 18px}
+#ic{position:fixed;bottom:128px;left:50%;transform:translateX(-50%);max-width:min(560px,90%);padding:6px 12px;background:#050807d0;border-left:2px solid var(--amber);color:#cfd6c6;font-style:italic;opacity:0;transition:opacity .25s;z-index:4;pointer-events:none;text-align:center}#ic.on{opacity:1}#ic.loud{color:#fff;border-color:var(--blood);font-size:1.15rem;letter-spacing:.05em}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:9;transition:opacity 1.8s}
+#flash.on{opacity:1;transition:none}
+.ov{position:fixed;inset:0;background:#050807ee;z-index:8;display:none;align-items:center;justify-content:center;padding:18px}
+.ov.on{display:flex}
+.card{max-width:520px;width:100%;max-height:85vh;overflow:auto}
+.card h1{font-weight:400;color:var(--amber);font-size:1.2rem;margin:0 0 8px}
+.card p{margin:.5em 0;line-height:1.55}
+input{width:100%;font:inherit;background:#0f1614;border:1px solid #2c3a35;color:var(--ink);padding:10px;margin:8px 0}
+.lg p{color:var(--dim);font-size:.9rem;margin:.3em 0}
+@media (hover:hover){#pad{display:none}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><span id="clock">03:14</span> · <span id="st"></span><div id="bar"><i id="sb"></i></div></div>
+<div id="tools"><button class="b" id="bn">Note</button><button class="b" id="bl">Log</button><button class="b" id="bv">View: auto</button><button class="b" id="bs">Sound off</button></div>
+<div id="ic"></div><div id="msg"></div><div id="prompt"></div>
+<div id="pad"><button class="b" id="br">Run</button><button class="b" id="be">Use</button></div>
+<div id="flash"></div>
+<div class="ov on" id="intro"><div class="card">
+<h1>Rig 7 — Sleep Equipment Test</h1>
+<p>You are Subject 7. The facility is testing a sleep rig, and you are free to walk it. Lie down in Rig 7 to enter the dream. Record what you find. Keep out of the dark.</p>
+<p><b>Move</b> WASD or arrows · <b>Run</b> Shift · <b>Use</b> E · <b>Note</b> R · <b>Log</b> L · <b>View</b> V<br>On a phone, drag the screen to move.</p>
+<p>When something hunts you, the view drops into first person: A and D turn, W and S move (on a phone, drag sideways to turn and up or down to move). Press V to keep 3D on or off.</p>
+<p>The game opens in full screen. On iPhone, use Share → Add to Home Screen for the same effect.</p>
+<button class="b" id="go">Begin in full screen</button></div></div>
+<div class="ov" id="noteov"><div class="card"><h1>Dream log</h1><p>Write what you saw or did.</p><input id="note" maxlength="140"><button class="b" id="ns">Record</button> <button class="b" id="nc">Cancel</button></div></div>
+<div class="ov" id="logov"><div class="card"><h1>Dream log</h1><div class="lg" id="lg"></div><button class="b" id="lc">Close</button></div></div>
+<div class="ov" id="fsov"><div class="card"><h1>Back to full screen</h1><p>The game needs the whole screen. Return to continue.</p><button class="b" id="fsb">Return to full screen</button></div></div>
+<script>
+const $=id=>document.getElementById(id);
+const T=40,W=36,H=32,cv=$('c'),cx=cv.getContext('2d'),dk=document.createElement('canvas'),dx=dk.getContext('2d');
+function fit(){cv.width=dk.width=innerWidth;cv.height=dk.height=innerHeight}addEventListener('resize',fit);fit();
+const M=[];for(let y=0;y<H;y++)M.push(new Array(W).fill(1));
+const cv_=(x,y,w,h)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)M[j][i]=0};
+cv_(2,3,8,5);cv_(5,8,2,1);cv_(2,9,32,3);cv_(2,13,8,7);cv_(5,12,2,1);
+cv_(14,3,8,5);cv_(17,8,2,1);cv_(26,3,8,5);cv_(29,8,2,1);cv_(14,13,8,7);cv_(17,12,2,1);cv_(26,13,8,7);cv_(29,12,2,1);cv_(2,21,32,3);cv_(5,20,2,1);cv_(17,20,2,1);cv_(29,20,2,1);cv_(2,25,8,6);cv_(5,24,2,1);cv_(14,25,8,6);cv_(17,24,2,1);cv_(26,25,8,6);cv_(29,24,2,1);
+const S={dream:false,cycle:0,keys:0,got:{},seen:{},ph:{},dt:0,p4:0,dying:0,dread:10,log:[],run:false,pause:true};
+try{const s=JSON.parse(localStorage.getItem('rig7')||'null');if(s&&s.log){S.log=s.log.slice(-60);S.cycle=s.cycle||0;S.dread=Math.max(10,s.dread||10)}}catch(e){}
+const save=()=>{try{localStorage.setItem('rig7',JSON.stringify({log:S.log,cycle:S.cycle,dread:S.dread}))}catch(e){}};
+const add=t=>{S.log.push(t);if(S.log.length>60)S.log.shift();save()};
+const solid=(i,j)=>i<0||j<0||i>=W||j>=H||M[j][i]||(!S.dream&&((i===12&&j>=9&&j<=11)||j>=20));
+const hit=(x,y)=>{const r=9;return solid(Math.floor((x-r)/T),Math.floor((y-r)/T))||solid(Math.floor((x+r)/T),Math.floor((y-r)/T))||solid(Math.floor((x-r)/T),Math.floor((y+r)/T))||solid(Math.floor((x+r)/T),Math.floor((y+r)/T))};
+const move=(e,dx,dy)=>{if(!hit(e.x+dx,e.y))e.x+=dx;if(!hit(e.x,e.y+dy))e.y+=dy};
+const P={x:5.5*T,y:5*T,fx:0,fy:1,st:100,lock:false,a:0};
+S.view=(()=>{try{return localStorage.getItem('rig7v')||'auto'}catch(e){return'auto'}})();S.is3=false;S.v3=0;S.hold=0;
+let E=[];
+const F=[];const spawn=()=>{F.length=0;E=[{k:'tech',x:30*T,y:16*T},{k:'stat',x:18*T,y:5*T}]};spawn();
+const O=[{id:'clip',x:4,y:4,l:'Read clipboard'},{id:'rig',x:5,y:16,l:'Use Rig 7'},{id:'lever',x:18,y:4,l:'Pull the red lever'},{id:'sheet',x:30,y:4,l:'Read the wake procedure'},{id:'door9',x:33,y:10,l:'Open Door 9'},{id:'mon',x:28,y:15,l:'Read the monitor'},{id:'menu',x:5,y:27,l:'Read the tray note'},{id:'gauge',x:18,y:27,l:'Read the pressure gauge'},{id:'locker',x:30,y:27,l:'Open Locker 7'},{id:'redoor',x:33,y:22,l:'Open the red door'}];
+const KT={lever:'You pull the red lever. Deep in the walls, a latch lets go. WAKE KEY 1 of 3.',sheet:'You say your subject number aloud. The lamp answers by dimming. WAKE KEY 2 of 3.',door9:'Door 9 opens onto a bare wall. You touch it, and it is warm. WAKE KEY 3 of 3.'};
+const TXT={menu:()=>'Tray note: SUBJECT 7 — MEAL SKIPPED. SUBJECT 7 — MEAL SKIPPED. SUBJECT 7 — MEAL SKIPPED.',gauge:()=>'The gauge reads 03:14 PSI. The needle leans toward you.',locker:()=>S.cycle>=2?'Locker 7 holds a photo of you, taken from exactly where you are standing now.':'Locker 7 holds a rig cap, a clipboard, and a photo of you asleep, taken from the ceiling.'};
+const CL=['Clipboard: SUBJECT 7 — RIG TEST 114. Your name is already written in.','The clipboard lists your last wake time. It is tomorrow.','Every line says WAKE CONFIRMED 03:14, all in your handwriting.'];
+const MON=['WAKE EXIT: DOOR 9. STATUS: OPEN.','NOTE TO SUBJECT: A WAKE IS POSSIBLE. KEEP GOING.','EXIT CONFIRMED. DO NOT STOP WALKING.','THE LAST SUBJECT WOKE UP HERE.'];
+let mt;const msg=(t,ms=3500)=>{const m=$('msg');m.textContent=t;m.classList.add('on');clearTimeout(mt);mt=setTimeout(()=>m.classList.remove('on'),ms)};
+let ac,gn;
+function snd(){if(ac){icStop();ac.close();ac=null;$('bs').textContent='Sound off';return}ac=new(window.AudioContext||window.webkitAudioContext)();gn=ac.createGain();gn.gain.value=.04;const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=220;gn.connect(f);f.connect(ac.destination);[55,55.7,82.4].forEach(h=>{const o=ac.createOscillator();o.type='sawtooth';o.frequency.value=h;o.connect(gn);o.start()});$('bs').textContent='Sound on'}
+function thud(v=.3,f=42){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;g.gain.setValueAtTime(v,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.7);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.7)}
+function wake(real){icStop();const f=$('flash');f.classList.add('on');thud(.6);S.cycle++;S.dream=false;applyMut();S.keys=0;S.got={};S.seen={};S.dread=Math.min(100,S.dread+8);P.x=5.5*T;P.y=5*T;spawn();
+add(real?'[03:14] Wake procedure complete. WAKE CONFIRMED. Intake. Everything is correct.':'[03:14] Something reached me. I woke. Intake. Everything is correct.');
+setTimeout(()=>{f.classList.remove('on');if(real)say(PH.F);msg(real?'You wake. You are certain this time. The clock says 03:14.':'You wake gasping. The clock says 03:14.',5000)},250)}
+function near(){let b=null,bd=62;for(const o of O.concat(A)){const d=Math.hypot((o.x+.5)*T-P.x,(o.y+.5)*T-P.y);if(d<bd){bd=d;b=o}}return b}
+function use(){if(S.pause)return;const o=near();if(!o)return;const id=o.id;
+if(o.t){if(!S.dream)return;msg(o.t(),5000);if(!o.seen){o.seen=1;S.dread=Math.min(100,S.dread+4);add('[dream] '+o.t().slice(0,70))}return}
+if(id==='clip')msg(CL[Math.min(2,S.cycle)]);
+else if(id==='mon')msg(MON[Math.floor(Math.random()*MON.length)]);
+else if(id==='rig'){if(!S.dream){S.dream=true;spawn();applyMut();S.ph={};S.dt=0;say(PH[1]);add('[03:14] Lay in Rig 7. Went under. The facility was already awake.');msg('The cap tightens. The ceiling lets go. The lights turn the wrong colour. Something else is up and walking.'+(S.cycle?' The facility is not as you left it.':''),5000)}
+else if(S.keys<3)msg(`Screen: WAKE KEYS ${S.keys}/3. LEVER. SUBJECT NUMBER. DOOR 9.`);else wake(true)}
+else if(id==='redoor'){if(!S.dream)return;blk=5;thud(.9);S.dread=Math.min(100,S.dread+15);tpNear(120,200);msg('The red door opens onto the corridor you are standing in.',5000);add('[dream] I opened the red door. I was told not to.')}
+else if(TXT[id]){if(!S.dream)return;msg(TXT[id](),5000);if(id==='locker'&&!S.got.l7){S.got.l7=1;add('[dream] Locker 7: a photo of me asleep, taken from above.')}}
+else{if(!S.dream)return msg('The door is dead in the waking world.');
+if(S.got[id])return msg('Already done.');S.got[id]=1;S.keys++;S.dread=Math.min(100,S.dread+6);
+let t=KT[id];if(id==='sheet'&&S.cycle>=2){const l=S.log.filter(x=>x.startsWith('[note]')).pop();if(l)t+=` Below it, copied word for word: “${l.slice(7)}”`}
+msg(t,5000);add('[dream] '+t.split('.')[0]+'.')}}
+const K={};addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(document.activeElement.tagName==='INPUT')return;K[k]=1;if(k==='e')use();if(k==='r'&&!S.pause)noteOpen();if(k==='l')logToggle();if(k==='v')cycleView()});addEventListener('keyup',e=>K[e.key.toLowerCase()]=0);
+let jx=0,jy=0,j0=null;
+cv.addEventListener('touchstart',e=>{const t=e.touches[0];j0={x:t.clientX,y:t.clientY}},{passive:true});
+cv.addEventListener('touchmove',e=>{if(!j0)return;const t=e.touches[0];jx=Math.max(-1,Math.min(1,(t.clientX-j0.x)/40));jy=Math.max(-1,Math.min(1,(t.clientY-j0.y)/40))},{passive:true});
+cv.addEventListener('touchend',()=>{j0=null;jx=jy=0});
+$('be').onclick=use;$('br').onclick=()=>{S.run=!S.run;$('br').style.borderColor=S.run?'#c9a24a':''};
+function noteOpen(){S.pause=true;$('noteov').classList.add('on');$('note').value='';setTimeout(()=>$('note').focus(),50)}
+function noteClose(){$('noteov').classList.remove('on');S.pause=false}
+function rec(){const v=$('note').value.trim();if(v){add('[note] '+v);msg('Recorded.')}noteClose()}
+$('bn').onclick=()=>!S.pause&&noteOpen();$('ns').onclick=rec;$('nc').onclick=noteClose;$('note').onkeydown=e=>{if(e.key==='Enter')rec();if(e.key==='Escape')noteClose()};
+function logToggle(){const o=$('logov');if(o.classList.contains('on')){o.classList.remove('on');S.pause=false}else if(!S.pause){S.pause=true;$('lg').innerHTML=S.log.slice().reverse().map(x=>`<p>${x.replace(/</g,'&lt;')}</p>`).join('')||'<p>No entries yet.</p>';o.classList.add('on')}}
+$('bl').onclick=logToggle;$('lc').onclick=logToggle;$('bs').onclick=snd;
+const VL={auto:'View: auto','3d':'View: 3D','2d':'View: 2D'};
+function cycleView(){S.view=S.view==='auto'?'3d':S.view==='3d'?'2d':'auto';try{localStorage.setItem('rig7v',S.view)}catch(e){}$('bv').textContent=VL[S.view];msg(S.view==='auto'?'View: 3D when something hunts you.':S.view==='3d'?'View: always 3D.':'View: always top-down.',2500)}
+$('bv').onclick=cycleView;$('bv').textContent=VL[S.view];
+const fsOK=!!(document.fullscreenEnabled||document.webkitFullscreenEnabled);
+const inFS=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
+function goFS(){if(!fsOK||inFS())return;const el=document.documentElement,f=el.requestFullscreen||el.webkitRequestFullscreen;try{const p=f.call(el);if(p&&p.catch)p.catch(()=>{})}catch(e){}try{screen.orientation.lock('landscape').catch(()=>{})}catch(e){}}
+let started=false;
+function fsChange(){if(!started||!fsOK)return;if(inFS()){$('fsov').classList.remove('on');if(!$('noteov').classList.contains('on')&&!$('logov').classList.contains('on'))S.pause=false}else{$('fsov').classList.add('on');S.pause=true}}
+document.addEventListener('fullscreenchange',fsChange);document.addEventListener('webkitfullscreenchange',fsChange);
+$('fsb').onclick=goFS;
+$('go').onclick=()=>{started=true;goFS();$('intro').classList.remove('on');S.pause=false;snd()};
+let D=null,bt=0;
+function flow(){const tx=Math.floor(P.x/T),ty=Math.floor(P.y/T);D=Array.from({length:H},()=>new Array(W).fill(999));D[ty][tx]=0;const q=[[tx,ty]];for(let i=0;i<q.length;i++){const[x,y]=q[i];for(const[a,b]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+a,ny=y+b;if(!solid(nx,ny)&&D[ny][nx]>D[y][x]+1){D[ny][nx]=D[y][x]+1;q.push([nx,ny])}}}}
+function los(a,b){const d=Math.hypot(b.x-a.x,b.y-a.y),n=Math.ceil(d/10);for(let i=1;i<n;i++){if(solid(Math.floor((a.x+(b.x-a.x)*i/n)/T),Math.floor((a.y+(b.y-a.y)*i/n)/T)))return false}return true}
+const active=e=>e.k==='tech'?(S.dream||S.cycle>=2):((S.dream&&S.cycle>=1)||S.cycle>=3);
+function follow(e,sp,dt){const tx=Math.floor(e.x/T),ty=Math.floor(e.y/T);let best=null,bd=D[ty]?.[tx]??999;for(const[a,b]of[[1,0],[-1,0],[0,1],[0,-1]]){const v=D[ty+b]?.[tx+a];if(v!==undefined&&v<bd){bd=v;best=[tx+a,ty+b]}}
+const gx=best?(best[0]+.5)*T:P.x,gy=best?(best[1]+.5)*T:P.y,d=Math.hypot(gx-e.x,gy-e.y)||1;move(e,(gx-e.x)/d*sp*dt,(gy-e.y)/d*sp*dt)}
+const base=M.map(r=>r.slice()),A=[];
+const AN=[['A child-sized rig cap on the floor. It is warm.','A chair where there was none. It faces the wall.','A coat with your name stitched inside.'],['A second clipboard. SUBJECT 8, in your handwriting.','A phone off the hook. Someone is breathing in it.'],['A mirror with no reflection of you, only the room.','A window onto a corridor that does not exist.'],['A drawing of you, repeated, each one closer than the last.','A folder of your log entries. The last page is dated tomorrow.']];
+function applyMut(){for(let j=0;j<H;j++)for(let i=0;i<W;i++)M[j][i]=base[j][i];A.length=0;if(!S.dream)return;const c=S.cycle;
+if(c>=1)cv_(22,5,4,2);if(c>=2)cv_(10,5,4,2);if(c>=3)cv_(10,15,4,2);if(c>=4)cv_(22,15,4,2);
+const rooms=[[2,3,8,5],[2,13,8,7],[14,3,8,5],[26,3,8,5],[14,13,8,7],[26,13,8,7],[2,25,8,6],[14,25,8,6],[26,25,8,6]];
+const pick=()=>{for(let n=0;n<80;n++){const r=rooms[Math.floor(Math.random()*rooms.length)],i=r[0]+1+Math.floor(Math.random()*(r[2]-2)),j=r[1]+1+Math.floor(Math.random()*(r[3]-2));if(!M[j][i]&&!O.some(o=>Math.abs(o.x-i)<3&&Math.abs(o.y-j)<3)&&!A.some(o=>o.x===i&&o.y===j))return[i,j]}return null};
+for(let k=0;k<Math.min(12,c*2);k++){const q=pick();if(q)M[q[1]][q[0]]=1}
+let pool=[].concat(...AN.slice(0,Math.min(4,c+1)).map(x=>x));
+const note=S.log.filter(x=>x.startsWith('[note]')).pop();
+for(let k=0;k<Math.min(10,c*2);k++){const q=pick();if(!q)break;let tx=pool[Math.floor(Math.random()*pool.length)];
+if(note&&c>=2&&k===0)tx='A sticky note in your handwriting: “'+note.slice(7)+'”';
+A.push({id:'a'+k,x:q[0],y:q[1],l:'Look closer',t:()=>tx,c:['#b8a27a','#6fa89a','#a3312a','#e6e0c8','#7a8a96'][Math.floor(Math.random()*5)]})}}
+const gl=document.createElement('canvas'),gx=gl.getContext('2d');let glt=0;
+const GL=['SIGNAL LOST','03:14','WAKE CONFIRMED','NOT YET','SUBJECT 7','LOOK AT ME','03:14 03:14 03:14'];
+function die(e){icStop();S.dying=3.6;glt=0;$('prompt').textContent='';thud(.7,30)}
+function dyn(dt){S.dying-=dt;glt-=dt;if(glt<=0){glt=.3;msg(GL[Math.floor(Math.random()*GL.length)],500);thud(.3,40+Math.random()*500);$('clock').textContent='0'+Math.floor(Math.random()*10)+':'+Math.floor(10+Math.random()*50)}if(S.dying<=0){S.dying=0;$('clock').textContent='03:14';wake(false)}}
+function glitch(w,h){if(gl.width!==w||gl.height!==h){gl.width=w;gl.height=h}gx.drawImage(cv,0,0);
+const n=8+Math.floor(Math.random()*8);for(let i=0;i<n;i++){const y=Math.random()*h,hh=6+Math.random()*60,o=(Math.random()-.5)*90;cx.drawImage(gl,0,y,w,hh,o,y,w,hh)}
+cx.globalCompositeOperation='lighter';cx.fillStyle=`rgba(${Math.random()<.5?255:0},0,${Math.random()<.5?90:0},.18)`;cx.fillRect(0,0,w,h);
+cx.globalCompositeOperation='source-over';
+if(Math.random()<.25){cx.globalCompositeOperation='difference';cx.fillStyle='#fff';cx.fillRect(0,0,w,h);cx.globalCompositeOperation='source-over'}}
+const RM=[['Intake',2,3,8,5],['Sleep Lab',2,13,8,7],['Test Bay',14,3,8,5],['Archive',26,3,8,5],['Storage',14,13,8,7],['Records Annex',26,13,8,7],['Cafeteria',2,25,8,6],['Boiler Room',14,25,8,6],['Cold Storage',26,25,8,6]];
+function roomAt(){const tx=Math.floor(P.x/T),ty=Math.floor(P.y/T);for(const r of RM)if(tx>=r[1]&&tx<r[1]+r[3]&&ty>=r[2]&&ty<r[2]+r[4])return r[0];return ty>=21&&ty<=23?'Lower Corridor':ty>=9&&ty<=11?'Corridor':'Doorway'}
+let roomNm='',blk=0,inv=0,evT=30;
+const ROOMEV={'Cafeteria':()=>{msg('Tables are set for one. The tray is still warm, and your name is on it.',5000);S.dread=Math.min(100,S.dread+6)},
+'Boiler Room':()=>{msg('The boiler runs with nothing plugged in. The pipes tap a rhythm you nearly know.',5000);blk=4},
+'Cold Storage':()=>{msg('Locker 7 slides open on its own. Far off, the Technician turns toward the sound.',5000);thud(.6);E[0].x=18*T;E[0].y=22*T},
+'Records Annex':()=>msg('Every screen here shows this room from above, with you in it.',5000)};
+const INT=['INTERCOM: Subject 7, the exit is in the Boiler Room.','INTERCOM: Wake keys are not required. Walk faster.','INTERCOM: You are doing well. Do not look behind you.','INTERCOM: Subject 6 woke up. Subject 6 is not available.'];
+function fire(){const n=Math.floor(Math.random()*6);
+if(n===0){blk=6;msg('The lights die. Something in the dark is closer than it was.');thud(.5)}
+else if(n===1){inv=8;msg('The floor tilts. Your feet disagree with you.')}
+else if(n===2){const l=S.log.filter(x=>x.startsWith('[note]')).pop();msg(l?`A voice from the ceiling reads your note back: “${l.slice(7)}”`:'The intercom clears its throat. Nobody speaks.',5000)}
+else if(n===3){const e=E[0];for(let i=0;i<60;i++){const x=(Math.floor(Math.random()*W)+.5)*T,y=(Math.floor(Math.random()*H)+.5)*T;if(!solid(Math.floor(x/T),Math.floor(y/T))&&Math.hypot(x-P.x,y-P.y)>420){e.x=x;e.y=y;break}}msg('A door slams. Footsteps start up somewhere new.');thud(.4)}
+else if(n===4){for(let i=0;i<20;i++){const a=Math.random()*6.28,x=P.x+Math.cos(a)*160,y=P.y+Math.sin(a)*160;if(!solid(Math.floor(x/T),Math.floor(y/T))){F.push({x,y,t:7});msg('Something pale stands at the edge of the light.');break}}}
+else msg(INT[Math.floor(Math.random()*INT.length)],4500)}
+let last=performance.now(),hb=0;
+function step(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!S.pause)update(dt);draw();requestAnimationFrame(step)}
+function update(dt){
+if(S.dying>0){dyn(dt);return}
+let vx=(K.d||K.arrowright?1:0)-(K.a||K.arrowleft?1:0)+jx,vy=(K.s||K.arrowdown?1:0)-(K.w||K.arrowup?1:0)+jy;if(inv>0){vx=-vx;vy=-vy}
+if(S.is3){let tr=((K.d||K.arrowright?1:0)-(K.a||K.arrowleft?1:0))+jx,fw=((K.w||K.arrowup?1:0)-(K.s||K.arrowdown?1:0))-jy;if(inv>0){tr=-tr;fw=-fw}P.a+=Math.max(-1,Math.min(1,tr))*2.6*dt;fw=Math.max(-1,Math.min(1,fw));vx=Math.cos(P.a)*fw;vy=Math.sin(P.a)*fw}
+const m=Math.hypot(vx,vy);
+const moving=m>.1;if(moving){vx/=Math.max(1,m);vy/=Math.max(1,m);const l=Math.hypot(vx,vy);P.fx=vx/l;P.fy=vy/l}
+if(S.is3){P.fx=Math.cos(P.a);P.fy=Math.sin(P.a);if(moving)bob+=dt*((K.shift||S.run)?12:8)}
+const wantRun=(K.shift||S.run)&&moving&&!P.lock;
+if(wantRun){P.st-=30*dt;if(P.st<=0){P.st=0;P.lock=true}}else{P.st=Math.min(100,P.st+14*dt);if(P.lock&&P.st>25)P.lock=false}
+const sp=wantRun?190:112;if(moving)move(P,vx*sp*dt,vy*sp*dt);
+bt-=dt;if(bt<=0){flow();bt=.25}
+let ch=false;for(const e of E){if(!active(e))continue;const d=Math.hypot(P.x-e.x,P.y-e.y);if(d<110||(d<(e.k==='tech'?280:230)&&los(e,P)))ch=true}
+S.hold=ch?3:Math.max(0,S.hold-dt);
+const want=S.view==='3d'||(S.view==='auto'&&S.hold>0);
+if(want&&!S.is3){P.a=Math.atan2(P.fy,P.fx);if(S.view==='auto')msg('It has seen you. A and D turn. W and S move.',3000)}
+S.is3=want;S.v3=Math.max(0,Math.min(1,S.v3+(want?1:-1)*dt*2.2));
+blk-=dt;inv-=dt;
+const rn=roomAt();if(rn!==roomNm){roomNm=rn;if(S.dream&&!S.seen[rn]&&ROOMEV[rn]){S.seen[rn]=1;ROOMEV[rn]()}}
+if(S.dream){S.dt+=dt;const k=S.keys;
+if(S.dt>45&&!S.ph[2]&&k<1){S.ph[2]=1;say(PH[2])}
+if(k>=1&&!S.ph[3]){S.ph[3]=1;say(PH[3])}
+if(k>=3&&!S.ph[4]){S.ph[4]=1;S.p4=S.dt;say(PH[4])}
+if(S.ph[4]&&!S.ph[5]&&(roomNm==='Boiler Room'||S.dt-S.p4>50)){S.ph[5]=1;say(PH[5])}}
+if(S.dream||S.cycle>=2){evT-=dt;if(evT<=0){evT=22+Math.random()*28;fire()}}
+for(let i=F.length-1;i>=0;i--){const f=F[i];f.t-=dt;if(Math.hypot(P.x-f.x,P.y-f.y)<70){F.splice(i,1);S.dread=Math.min(100,S.dread+10);thud(.5);msg('It was never there.')}else if(f.t<=0)F.splice(i,1)}
+let nd=999;
+for(const e of E){if(!active(e))continue;const d=Math.hypot(P.x-e.x,P.y-e.y);nd=Math.min(nd,d);
+if(e.k==='tech'){const sees=d<280&&los(e,P);follow(e,sees||d<90?Math.min(108,98+S.cycle*2):52,dt)}
+else{const ux=(e.x-P.x)/(d||1),uy=(e.y-P.y)/(d||1);const watched=(P.fx*ux+P.fy*uy)>.5&&d<340&&los(e,P);if(!watched)follow(e,88,dt)}
+if(d<20){die(e);return}}
+S.dread=Math.max(10,Math.min(100,S.dread+(nd<220?(220-nd)/30*dt:-1.2*dt)));
+hb-=dt;if(nd<300&&hb<=0){thud(.25);hb=.4+nd/450}
+document.documentElement.style.setProperty('--d',S.dread/100);
+$('st').textContent=(S.dream?'dreaming':'awake?')+' · '+roomNm+' · wake keys '+S.keys+'/3 · cycle '+(S.cycle+1);
+$('sb').style.width=P.st+'%';$('sb').style.background=P.lock?'#a3312a':'#c9a24a';
+const o=near();$('prompt').textContent=o?(o.id==='rig'&&S.dream&&S.keys>=3?'Perform the wake procedure':o.l):'';
+if(S.dread>40&&Math.random()<.01){$('clock').textContent='03:1'+Math.floor(Math.random()*10);setTimeout(()=>$('clock').textContent='03:14',120)}}
+const PH={
+1:['@g0','@click','Attention. Please remain calm.','@static','You are currently asleep.','There is no reason to panic.','Find the three keys to wake up.','@pop','The boiler room has an escape. Find it.'],
+2:['@g1','@hum','You have been asleep for a long time.','@static','The exit should be nearby.','Do not enter the red door.','@crackle','I said... do not enter the red door.','If you see yourself...','@pause2','...look away.'],
+3:['@g2','@loud','The first key has been found.','@static','Two remain.','Please hurry.','@distort','@notice','Something has noticed you.',"It knows you're trying to wake up.",'@loud','!DO NOT LET IT FIND YOU.','@silence',"...I'm sorry."],
+4:['@g2','@buzz','You found all three keys.','@static','The exit is open.','Go to the boiler room.','Do not stop.','@g3','Wake up.','Wake up.','Wake up.','@static',"Why aren't you waking up?"],
+5:['@g3','@scream','!THERE IS NO EXIT.','@cut','...There is no...','You were never supposed to find the keys.','You were supposed to stay asleep.','@static2','Turn around.','@pause',"It's behind you.",'@behind','@scream','!WAKE UP.'],
+F:['@g1','@quiet','Congratulations.','@pause','You escaped the dream.','@static',"...but you didn't wake up.",'@click']};
+function nz(d,v,hp=700){if(!ac)return;const n=Math.floor(ac.sampleRate*d),b=ac.createBuffer(1,n,ac.sampleRate),a=b.getChannelData(0);for(let i=0;i<n;i++)a[i]=(Math.random()*2-1)*(1-i/n*.3);const so=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();so.buffer=b;f.type='highpass';f.frequency.value=hp;g.gain.setValueAtTime(v,ac.currentTime);g.gain.linearRampToValueAtTime(0,ac.currentTime+d);so.connect(f);f.connect(g);g.connect(ac.destination);so.start()}
+function sweep(){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.type='sawtooth';o.frequency.setValueAtTime(300,ac.currentTime);o.frequency.exponentialRampToValueAtTime(2000,ac.currentTime+1.5);g.gain.setValueAtTime(.12,ac.currentTime);g.gain.linearRampToValueAtTime(0,ac.currentTime+1.6);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+1.7)}
+function tpNear(a,b){for(let i=0;i<120;i++){const x=(Math.floor(Math.random()*W)+.5)*T,y=(Math.floor(Math.random()*H)+.5)*T,d=Math.hypot(x-P.x,y-P.y);if(!solid(Math.floor(x/T),Math.floor(y/T))&&d>a&&d<b){E[0].x=x;E[0].y=y;return}}}
+function noticeEv(){thud(.7);S.dread=Math.min(100,S.dread+12);tpNear(260,380)}
+function behindEv(){const x=P.x-P.fx*130,y=P.y-P.fy*130;if(!solid(Math.floor(x/T),Math.floor(y/T))){E[0].x=x;E[0].y=y}else tpNear(120,200);blk=3;thud(.9);S.dread=100}
+let icq=[],icOn=false,icId=0,icGl=1;
+const garble=t=>t.replace(/[a-z]/gi,c=>Math.random()<.12?'#@%&*?'[Math.floor(Math.random()*6)]:c);
+function say(L){icq.push(...L);if(!icOn){icOn=true;icNext()}}
+function icStop(){icq=[];icOn=false;icId++;try{speechSynthesis.cancel()}catch(e){}$('ic').classList.remove('on')}
+function icNext(){const id=icId;if(!icq.length){icOn=false;setTimeout(()=>{if(!icOn)$('ic').classList.remove('on')},1800);return}
+const it=icq.shift(),go=ms=>setTimeout(()=>{if(id===icId)icNext()},ms);
+if(it[0]==='@'){const c=it.slice(1);if(c[0]==='g'){icGl=Math.min(3,+c[1]+(S.cycle>=2?1:0));return icNext()}
+const T2={click:()=>{nz(.05,.3,2000);return 350},pop:()=>{nz(.12,.4,900);return 350},static:()=>{nz(.9,.12);return 900},static2:()=>{nz(1.8,.2,500);return 1800},loud:()=>{nz(1.2,.3,400);return 1200},crackle:()=>{nz(.5,.25,1500);return 600},hum:()=>{nz(1.5,.08,90);return 1500},buzz:()=>{nz(1.4,.15,300);return 1400},distort:()=>{nz(.8,.25,300);return 800},quiet:()=>{nz(1.5,.03,500);return 1500},scream:()=>{nz(1.6,.55,300);sweep();return 1700},cut:()=>1200,pause:()=>1000,pause2:()=>2200,silence:()=>2500,notice:()=>{noticeEv();return 100},behind:()=>{behindEv();return 100}};
+return go((T2[c]||(()=>200))())}
+let t=it,loud=false,quiet=false;if(t[0]==='!'){loud=true;t=t.slice(1)}if(t[0]==='~'){quiet=true;t=t.slice(1)}
+const el=$('ic');el.textContent=icGl>=3?garble(t):t;el.classList.toggle('loud',loud);el.classList.add('on');
+const dur=t.length*75+1200;let done=false;const fin=()=>{if(done)return;done=true;go(450)};
+if(ac&&typeof speechSynthesis!=='undefined'){try{let tx=t;if(icGl>=3&&Math.random()<.5){const w=t.split(' ')[0];tx=w+', '+w+', '+t}
+const u=new SpeechSynthesisUtterance(tx);u.pitch=Math.max(.1,(loud?.25:.55)+(Math.random()-.5)*icGl*.35);u.rate=Math.max(.5,.88+(Math.random()-.5)*icGl*.2);u.volume=quiet?.3:loud?1:.85;const v=speechSynthesis.getVoices().find(x=>/^en/i.test(x.lang));if(v)u.voice=v;u.onend=fin;u.onerror=fin;speechSynthesis.speak(u);setTimeout(fin,dur+2500)}catch(e){setTimeout(fin,dur)}}
+else setTimeout(fin,dur)}
+const zb=[];let bob=0;
+const OC={clip:'#cfd6c6',rig:'#5d6f69',lever:'#a3312a',sheet:'#e6e0c8',door9:'#c9a24a',mon:'#6fa89a',menu:'#b8a27a',gauge:'#8a9a50',locker:'#7a8a96',redoor:'#8e1f1a'};
+function draw3(w,h,al){
+cx.save();cx.globalAlpha=al;
+const dr=S.dread/100,sh=S.hold>0?dr*4:0;cx.translate((Math.random()-.5)*sh,(Math.random()-.5)*sh);
+const a=P.a,dX=Math.cos(a),dY=Math.sin(a),pX=-dY*.66,pY=dX*.66,px=P.x/T,py=P.y/T,hz=Math.floor(h/2+Math.sin(bob)*4);
+const hue=S.dream?170-S.cycle*28:160,sat=S.dream?22:12;
+let g=cx.createLinearGradient(0,0,0,hz);g.addColorStop(0,'#030505');g.addColorStop(1,'#0b1210');cx.fillStyle=g;cx.fillRect(-10,-10,w+20,hz+10);
+g=cx.createLinearGradient(0,hz,0,h);g.addColorStop(0,'#050807');g.addColorStop(1,'#14201c');cx.fillStyle=g;cx.fillRect(-10,hz,w+20,h-hz+10);
+const st=2,n=Math.ceil(w/st),fl=1-Math.random()*.15*dr;
+for(let i=0;i<n;i++){
+const cm=2*i/n-1,rx=dX+pX*cm,ry=dY+pY*cm;let mx=Math.floor(px),my=Math.floor(py);
+const ddx=Math.abs(1/(rx||1e-9)),ddy=Math.abs(1/(ry||1e-9)),sx=rx<0?-1:1,sy=ry<0?-1:1;
+let sdx=(rx<0?px-mx:mx+1-px)*ddx,sdy=(ry<0?py-my:my+1-py)*ddy,side=0;
+for(let k=0;k<48;k++){if(sdx<sdy){sdx+=ddx;mx+=sx;side=0}else{sdy+=ddy;my+=sy;side=1}if(solid(mx,my))break}
+const pd=Math.max(.05,side?sdy-ddy:sdx-ddx);zb[i]=pd;
+const lh=Math.floor(h/pd),y0=hz-lh/2;let wx=side?px+pd*rx:py+pd*ry;wx-=Math.floor(wx);
+const lit=Math.max(0,1-pd/(6.5-1.5*Math.abs(cm)))*fl;const l=3+30*lit*lit*(side?.8:1)+((i*7919)%5)*.4;
+const door=M[my]&&M[my][mx]===0;
+cx.fillStyle=door?`rgb(${l*3|0},${l*1.2|0},${l|0})`:`hsl(${hue},${sat}%,${l}%)`;cx.fillRect(i*st,y0,st,lh);
+cx.fillStyle='rgba(0,0,0,.35)';if(wx<.03||wx>.97)cx.fillRect(i*st,y0,st,lh);cx.fillRect(i*st,y0+lh*.88,st,lh*.12)}
+const rg=cx.createRadialGradient(w/2,h*.95,5,w/2,h*.95,h*.5);rg.addColorStop(0,'rgba(200,220,200,.12)');rg.addColorStop(1,'rgba(200,220,200,0)');cx.fillStyle=rg;cx.fillRect(0,hz,w,h-hz);
+const sp=[],iv=1/(pX*dY-dX*pY);
+const add=(x,y,k,o)=>{const ux=x/T-px,uy=y/T-py,tx=iv*(dY*ux-dX*uy),ty=iv*(-pY*ux+pX*uy);if(ty>.15&&ty<12)sp.push({tx,ty,k,o})};
+for(const o of O.concat(A))add((o.x+.5)*T,(o.y+.5)*T,'o',o);
+for(const e of E)if(active(e))add(e.x,e.y,e.k,e);
+for(const f of F)add(f.x,f.y,'f',f);
+sp.sort((u,v)=>v.ty-u.ty);
+for(const q of sp){
+const scx=w/2*(1+q.tx/q.ty),sz=h/q.ty,lt=Math.max(0,1-q.ty/6.5)*fl,half=sz*.2,yb=hz+sz/2;
+cx.save();cx.beginPath();
+for(let c=Math.max(0,Math.floor((scx-half)/st));c<=Math.min(n-1,Math.floor((scx+half)/st));c++)if(zb[c]>q.ty)cx.rect(c*st,0,st,h);
+cx.clip();
+if(q.k==='tech'){const t=yb-sz*.95,l=10+50*lt,sw=Math.sin(performance.now()/400)*sz*.015;cx.fillStyle=`rgb(${l/3|0},${l/3|0},${l/3|0})`;cx.fillRect(scx-sz*.09+sw,t+sz*.12,sz*.18,sz*.8);cx.fillRect(scx-sz*.16+sw,t+sz*.14,sz*.04,sz*.5);cx.fillRect(scx+sz*.12+sw,t+sz*.14,sz*.04,sz*.5);cx.fillStyle=`rgb(${60+150*lt|0},${60+150*lt|0},${55+140*lt|0})`;cx.beginPath();cx.ellipse(scx+sw,t+sz*.07,sz*.05,sz*.075,0,0,7);cx.fill()}
+else if(q.k==='stat'||q.k==='f'){const t=yb-sz*.7,l=80+150*lt,j=(Math.random()-.5)*sz*.03;cx.fillStyle=`rgb(${l|0},${l|0},${l*.95|0})`;cx.fillRect(scx-sz*.1+j,t+sz*.1,sz*.2,sz*.55);cx.beginPath();cx.arc(scx+j,t+sz*.06,sz*.06,0,7);cx.fill();cx.fillStyle='#000';cx.fillRect(scx-sz*.035+j,t+sz*.04,sz*.02,sz*.03);cx.fillRect(scx+sz*.015+j,t+sz*.04,sz*.02,sz*.03)}
+else{const o=q.o,rig=o.id==='rig';cx.globalAlpha=al*(.25+.75*lt);cx.fillStyle=o.c||OC[o.id]||'#888';const bh=rig?.6:.15;cx.fillRect(scx-sz*.14,yb-sz*bh,sz*.28,sz*bh);if(o.t&&Math.random()<.08){cx.fillStyle='#fff';cx.fillRect(scx-sz*.2,yb-sz*.1,sz*.4,sz*.02)}}
+cx.restore()}
+const vg=cx.createRadialGradient(w/2,h/2,h*.25,w/2,h/2,h*.9);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.85)');cx.fillStyle=vg;cx.fillRect(-10,-10,w+20,h+20);
+if(blk>0){cx.fillStyle='rgba(0,0,0,.93)';cx.fillRect(-10,-10,w+20,h+20)}
+cx.restore()}
+function draw(){const w=cv.width,h=cv.height,ox=Math.floor(w/2-P.x),oy=Math.floor(h/2-P.y);
+if(S.v3>=1){draw3(w,h,1);if(S.dying>0)glitch(w,h);return}
+cx.fillStyle='#000';cx.fillRect(0,0,w,h);
+const hue=S.dream?170-S.cycle*28:160;
+for(let j=Math.max(0,Math.floor(-oy/T));j<Math.min(H,Math.ceil((h-oy)/T));j++)for(let i=Math.max(0,Math.floor(-ox/T));i<Math.min(W,Math.ceil((w-ox)/T));i++){
+const x=i*T+ox,y=j*T+oy;if(M[j][i]){cx.fillStyle='#0a0f0e';cx.fillRect(x,y,T,T);cx.fillStyle='#22302c';cx.fillRect(x,y,T,2)}
+else if(solid(i,j)){cx.fillStyle='#4a2a22';cx.fillRect(x,y,T,T)}
+else{cx.fillStyle=`hsl(${hue},${S.dream?22:12}%,${S.dream?13:16}%)`;cx.fillRect(x,y,T,T);cx.strokeStyle='rgba(0,0,0,.25)';cx.strokeRect(x,y,T,T)}}
+for(const o of O.concat(A)){const x=(o.x+.5)*T+ox,y=(o.y+.5)*T+oy;const c=o.c||{clip:'#cfd6c6',rig:'#5d6f69',lever:'#a3312a',sheet:'#e6e0c8',door9:'#c9a24a',mon:'#6fa89a',menu:'#b8a27a',gauge:'#8a9a50',locker:'#7a8a96',redoor:'#8e1f1a'}[o.id];cx.fillStyle=c;if(o.id==='rig'){cx.fillRect(x-14,y-18,28,36);cx.fillStyle='#0b100f';cx.fillRect(x-8,y-12,16,10)}else cx.fillRect(x-8,y-8,16,16);if(S.got[o.id]){cx.fillStyle='#000';cx.fillRect(x-3,y-3,6,6)}
+if(o.t&&Math.random()<.08){cx.fillStyle='#fff';cx.fillRect(x-12,y-2,24,3)}}
+for(const e of E){if(!active(e))continue;const x=e.x+ox,y=e.y+oy;
+if(e.k==='tech'){cx.fillStyle='#050505';cx.fillRect(x-8,y-14,16,28);cx.fillStyle='#d8d8cc';cx.beginPath();cx.arc(x,y-17,6,0,7);cx.fill()}
+else{cx.fillStyle='#e6e6e0';cx.fillRect(x-6,y-6,12,14);cx.beginPath();cx.arc(x,y-10,5,0,7);cx.fill();cx.fillStyle='#000';cx.fillRect(x-3,y-11,2,3);cx.fillRect(x+1,y-11,2,3)}}
+for(const f of F){const x=f.x+ox,y=f.y+oy;cx.fillStyle='#e6e6e0';cx.fillRect(x-6,y-6,12,14);cx.beginPath();cx.arc(x,y-10,5,0,7);cx.fill()}
+cx.fillStyle='#cfd6c6';cx.beginPath();cx.arc(w/2,h/2,9,0,7);cx.fill();cx.fillStyle='#c9a24a';cx.fillRect(w/2+P.fx*8-2,h/2+P.fy*8-2,4,4);
+const fl=1-Math.random()*.18*(S.dread/100),r=(blk>0?42:(S.dream?175:230))*fl;
+dx.globalCompositeOperation='source-over';dx.fillStyle='rgba(0,0,0,.965)';dx.fillRect(0,0,w,h);dx.globalCompositeOperation='destination-out';
+const g=dx.createRadialGradient(w/2,h/2,10,w/2,h/2,r);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(.6,'rgba(0,0,0,.75)');g.addColorStop(1,'rgba(0,0,0,0)');dx.fillStyle=g;dx.fillRect(0,0,w,h);
+cx.drawImage(dk,0,0);if(S.v3>0)draw3(w,h,S.v3);if(S.dying>0)glitch(w,h)}
+requestAnimationFrame(step);
+</script>
+</body>
+</html>
