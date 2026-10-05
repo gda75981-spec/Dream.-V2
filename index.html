@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Rig 7 — Sleep Equipment Test</title>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#cfd6c6;--dim:#7d8a80;--amber:#c9a24a;--blood:#a3312a;--d:0}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#050807;color:var(--ink);font-family:'Special Elite','Courier New',monospace;overflow:hidden;touch-action:none}
+canvas{display:block;position:fixed;inset:0}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 40%,rgba(60,0,0,calc(var(--d)*.5)) 100%);z-index:3}
+#hud{position:fixed;top:10px;left:12px;font-size:.85rem;z-index:4;text-shadow:0 0 4px #000;pointer-events:none}
+#bar{width:110px;height:5px;background:#1a2320;margin-top:5px}#bar i{display:block;height:100%;background:var(--amber);width:100%}
+#prompt{position:fixed;bottom:84px;width:100%;text-align:center;color:var(--amber);z-index:4;pointer-events:none}
+#msg{position:fixed;top:22%;left:50%;transform:translateX(-50%);width:min(560px,90%);text-align:center;z-index:4;opacity:0;transition:opacity .6s;text-shadow:0 0 6px #000;pointer-events:none}
+#msg.on{opacity:1}
+#tools{position:fixed;right:10px;top:8px;display:flex;gap:6px;z-index:6}
+.b{font:inherit;color:var(--ink);background:#101816cc;border:1px solid #2c3a35;padding:8px 12px;border-radius:2px;cursor:pointer}
+.b:focus-visible,.b:hover{border-color:var(--amber);outline:none}
+#pad{position:fixed;right:12px;bottom:14px;display:flex;gap:8px;z-index:6}
+#pad .b{padding:16px 18px}
+#ic{position:fixed;bottom:128px;left:50%;transform:translateX(-50%);max-width:min(560px,90%);padding:6px 12px;background:#050807d0;border-left:2px solid var(--amber);color:#cfd6c6;font-style:italic;opacity:0;transition:opacity .25s;z-index:4;pointer-events:none;text-align:center}#ic.on{opacity:1}#ic small{display:block;font-style:normal;font-size:.7rem;letter-spacing:.12em;color:var(--dim)}#ic.v2{border-color:#6fa89a;color:#bfe3d8}#ic.v2 small{color:#6fa89a}#ic.loud{color:#fff;border-color:var(--blood);font-size:1.15rem;letter-spacing:.05em}
+#chase{position:fixed;top:62px;left:12px;z-index:4;color:#e0463c;font-size:.85rem;letter-spacing:.12em;text-shadow:0 0 8px #000;pointer-events:none;animation:pl 1s infinite}#chase.dim{color:var(--amber);animation:none}@keyframes pl{50%{opacity:.4}}
+@media (prefers-reduced-motion:reduce){#chase{animation:none}}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:9;transition:opacity 1.8s}
+#flash.on{opacity:1;transition:none}
+.ov{position:fixed;inset:0;background:#050807ee;z-index:8;display:none;align-items:center;justify-content:center;padding:18px}
+.ov.on{display:flex}
+.card{max-width:520px;width:100%;max-height:85vh;overflow:auto}
+.card h1{font-weight:400;color:var(--amber);font-size:1.2rem;margin:0 0 8px}
+.card p{margin:.5em 0;line-height:1.55}
+input{width:100%;font:inherit;background:#0f1614;border:1px solid #2c3a35;color:var(--ink);padding:10px;margin:8px 0}
+.lg p{color:var(--dim);font-size:.9rem;margin:.3em 0}
+#joy{position:fixed;left:18px;bottom:22px;width:138px;height:138px;border-radius:50%;background:#101816aa;border:1px solid #2c3a35;z-index:6;touch-action:none;display:flex;align-items:center;justify-content:center}
+#knob{width:56px;height:56px;border-radius:50%;background:#c9a24a55;border:1px solid var(--amber);pointer-events:none}
+.b.hold{border-color:var(--amber);color:var(--amber)}
+#pad .b{touch-action:none;user-select:none}
+#tools{flex-wrap:wrap;justify-content:flex-end;max-width:62%}#tools .b{padding:6px 9px;font-size:.8rem}
+@media (hover:hover){#pad,#joy{display:none}}
+#minimap{position:fixed;left:12px;top:72px;width:180px;height:140px;z-index:5;background:rgba(3,7,6,.88);border:1px solid #33443d;box-shadow:0 0 18px #000;pointer-events:none;border-radius:3px;overflow:hidden}#minimap canvas{position:absolute;inset:0;width:100%;height:100%}#maplabel{position:absolute;left:7px;top:5px;color:#c9a24a;font-size:.68rem;letter-spacing:.12em;text-shadow:0 0 5px #000}.mapfloor{position:absolute;right:7px;top:5px;color:#7d8a80;font-size:.62rem}.mapscan{position:absolute;inset:0;background:linear-gradient(transparent 48%,rgba(111,168,154,.05) 50%,transparent 52%);background-size:100% 8px;mix-blend-mode:screen;opacity:.5}@media(max-width:600px){#minimap{width:150px;height:116px;top:70px;left:8px}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><span id="clock">03:14</span> · <span id="st"></span><div id="bar"><i id="sb"></i></div></div>
+<div id="chase"></div><div id="minimap"><canvas id="mapc"></canvas><span id="maplabel">FACILITY MAP</span><span class="mapfloor" id="mapfloor">FLOOR 1</span><span class="mapscan"></span></div>
+<div id="tools"><button class="b" id="bn">Note</button><button class="b" id="bl">Log</button><button class="b" id="brs">Restart</button><button class="b" id="bv">View: auto</button><button class="b" id="bs">Sound off</button></div>
+<div id="ic"></div><div id="msg"></div><div id="prompt"></div>
+<div id="pad"><button class="b" id="br">Run</button><button class="b" id="be">Use</button></div>
+<div id="joy"><div id="knob"></div></div>
+<div id="flash"></div>
+<div class="ov on" id="intro"><div class="card">
+<h1>Rig 7 — Sleep Equipment Test</h1>
+<p>You are Subject 7. The facility is testing a sleep rig, and you are free to walk it. Lie down in Rig 7 to enter the dream. Record what you find. Keep out of the dark.</p>
+<p><b>Move</b> WASD or arrows · <b>Run</b> Shift · <b>Use</b> E · <b>Note</b> R · <b>Log</b> L · <b>View</b> V<br>On a phone, use the joystick to move and hold Run to sprint.</p>
+<p>When something hunts you, the game freezes for a moment, then drops into first person. In 3D: WASD moves, and the arrow keys or a mouse drag look around. On a phone the joystick moves and dragging the screen looks around, and you can do both at once. Press V to keep 3D on or off.</p>
+<p>The game opens in full screen. On iPhone, use Share → Add to Home Screen for the same effect.</p>
+<button class="b" id="go">Begin in full screen</button></div></div>
+<div class="ov" id="noteov"><div class="card"><h1>Dream log</h1><p>Write what you saw or did.</p><input id="note" maxlength="140"><button class="b" id="ns">Record</button> <button class="b" id="nc">Cancel</button></div></div>
+<div class="ov" id="logov"><div class="card"><h1>Dream log</h1><div class="lg" id="lg"></div><button class="b" id="lc">Close</button></div></div>
+<div class="ov" id="rsov"><div class="card"><h1>Restart?</h1><p>Go back to cycle 1. This clears your dream log.</p><button class="b" id="rsy">Restart</button> <button class="b" id="rsn">Cancel</button></div></div>
+<div class="ov" id="fsov"><div class="card"><h1>Back to full screen</h1><p>The game needs the whole screen. Return to continue.</p><button class="b" id="fsb">Return to full screen</button></div></div>
+<script>
+const $=id=>document.getElementById(id);
+const T=40,W=36,H=32,cv=$('c'),cx=cv.getContext('2d'),dk=document.createElement('canvas'),dx=dk.getContext('2d');
+function fit(){cv.width=dk.width=innerWidth;cv.height=dk.height=innerHeight}addEventListener('resize',fit);fit();
+const M=[];for(let y=0;y<H;y++)M.push(new Array(W).fill(1));
+const cv_=(x,y,w,h)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)M[j][i]=0};
+cv_(2,3,8,5);cv_(5,8,2,1);cv_(2,9,32,3);cv_(2,13,8,7);cv_(5,12,2,1);
+cv_(14,3,8,5);cv_(17,8,2,1);cv_(26,3,8,5);cv_(29,8,2,1);cv_(14,13,8,7);cv_(17,12,2,1);cv_(26,13,8,7);cv_(29,12,2,1);cv_(2,21,32,3);cv_(5,20,2,1);cv_(17,20,2,1);cv_(29,20,2,1);cv_(2,25,8,6);cv_(5,24,2,1);cv_(14,25,8,6);cv_(17,24,2,1);cv_(26,25,8,6);cv_(29,24,2,1);
+const S={dream:false,cycle:0,floor:1,stairLock:0,keys:0,got:{},seen:{},ph:{},dt:0,p4:0,tz:0,amb:15,js:0,jt:0,killer:'tech',dying:0,dread:10,log:[],run:false,pause:true};
+try{const s=JSON.parse(localStorage.getItem('rig7')||'null');if(s&&s.log){S.log=s.log.slice(-60);S.cycle=s.cycle||0;S.dread=Math.max(10,s.dread||10)}}catch(e){}
+const save=()=>{try{localStorage.setItem('rig7',JSON.stringify({log:S.log,cycle:S.cycle,dread:S.dread}))}catch(e){}};
+const add=t=>{S.log.push(t);if(S.log.length>60)S.log.shift();save()};
+function currentStair(){return STAIRS.find(s=>s.floor===S.floor)}
+function floorStairNear(){const st=currentStair();return Math.hypot(P.x/T-st.x,P.y/T-st.y)<1.05}
+function switchFloor(){if(S.stairLock>0||!floorStairNear())return;const old=S.floor;S.floor=old===1?2:1;const st=currentStair();P.x=st.x*T;P.y=st.y*T;S.stairLock=.9;S.dread=Math.min(100,S.dread+3);msg(S.floor===2?'You climb the stairs. The second floor is colder.':'You descend the stairs. Something followed you down.',3200);thud(.45,S.floor===2?48:38)}
+const solid=(i,j)=>i<0||j<0||i>=W||j>=H||M[j][i]||(!S.dream&&((i===12&&j>=9&&j<=11)||j>=20));
+const hit=(x,y)=>{const r=9;return solid(Math.floor((x-r)/T),Math.floor((y-r)/T))||solid(Math.floor((x+r)/T),Math.floor((y-r)/T))||solid(Math.floor((x-r)/T),Math.floor((y+r)/T))||solid(Math.floor((x+r)/T),Math.floor((y+r)/T))};
+const move=(e,dx,dy)=>{if(!hit(e.x+dx,e.y))e.x+=dx;if(!hit(e.x,e.y+dy))e.y+=dy};
+const P={x:5.5*T,y:5*T,fx:0,fy:1,st:100,lock:false,a:0};
+S.view=(()=>{try{return localStorage.getItem('rig7v')||'auto'}catch(e){return'auto'}})();S.is3=false;S.v3=0;S.hold=0;
+let E=[];
+const F=[];const STAIRS=[{floor:1,x:13.5,y:10},{floor:2,x:13.5,y:13.5}];
+const spawn=()=>{F.length=0;E=[{k:'tech',x:30*T,y:16*T,floor:1},{k:'stat',x:18*T,y:5*T,floor:1}]};spawn();
+const O=[{id:'stairs',x:13.5,y:10,l:'Use the stairwell'}, {id:'clip',x:4,y:4,l:'Read clipboard'},{id:'rig',x:5,y:16,l:'Use Rig 7'},{id:'lever',x:18,y:4,l:'Pull the red lever'},{id:'sheet',x:30,y:4,l:'Read the wake procedure'},{id:'door9',x:33,y:10,l:'Open Door 9'},{id:'mon',x:28,y:15,l:'Read the monitor'},{id:'menu',x:5,y:27,l:'Read the tray note'},{id:'gauge',x:18,y:27,l:'Read the pressure gauge'},{id:'locker',x:30,y:27,l:'Open Locker 7'},{id:'redoor',x:33,y:22,l:'Open the red door'}];
+const KT={lever:'You pull the red lever. Deep in the walls, a latch lets go. WAKE KEY 1 of 3.',sheet:'You say your subject number aloud. The lamp answers by dimming. WAKE KEY 2 of 3.',door9:'Door 9 opens onto a bare wall. You touch it, and it is warm. WAKE KEY 3 of 3.'};
+const TXT={menu:()=>'Tray note: SUBJECT 7 — MEAL SKIPPED. SUBJECT 7 — MEAL SKIPPED. SUBJECT 7 — MEAL SKIPPED.',gauge:()=>'The gauge reads 03:14 PSI. The needle leans toward you.',locker:()=>S.cycle>=2?'Locker 7 holds a photo of you, taken from exactly where you are standing now.':'Locker 7 holds a rig cap, a clipboard, and a photo of you asleep, taken from the ceiling.'};
+const CL=['Clipboard: SUBJECT 7 — RIG TEST 114. Your name is already written in.','The clipboard lists your last wake time. It is tomorrow.','Every line says WAKE CONFIRMED 03:14, all in your handwriting.'];
+const MON=['WAKE EXIT: DOOR 9. STATUS: OPEN.','NOTE TO SUBJECT: A WAKE IS POSSIBLE. KEEP GOING.','EXIT CONFIRMED. DO NOT STOP WALKING.','THE LAST SUBJECT WOKE UP HERE.'];
+let mt;const msg=(t,ms=3500)=>{const m=$('msg');m.textContent=t;m.classList.add('on');clearTimeout(mt);mt=setTimeout(()=>m.classList.remove('on'),ms)};
+let ac,gn;
+function snd(){if(ac){icStop();ac.close();ac=null;$('bs').textContent='Sound off';return}ac=new(window.AudioContext||window.webkitAudioContext)();gn=ac.createGain();gn.gain.value=.04;const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=220;gn.connect(f);f.connect(ac.destination);[55,55.7,82.4].forEach(h=>{const o=ac.createOscillator();o.type='sawtooth';o.frequency.value=h;o.connect(gn);o.start()});$('bs').textContent='Sound on'}
+function thud(v=.3,f=42){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;g.gain.setValueAtTime(v,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+.7);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.7)}
+function wake(real){icStop();const f=$('flash');f.classList.add('on');thud(.6);S.cycle++;S.floor=1;S.stairLock=0;S.dream=false;S.hold=0;applyMut();S.keys=0;S.got={};S.seen={};S.dread=Math.min(100,S.dread+8);P.x=5.5*T;P.y=5*T;spawn();
+add(real?'[03:14] Wake procedure complete. WAKE CONFIRMED. Intake. Everything is correct.':'[03:14] Something reached me. I woke. Intake. Everything is correct.');
+setTimeout(()=>{f.classList.remove('on');if(real)say(PH.F);msg(real?'You wake. You are certain this time. The clock says 03:14.':'You wake gasping. The clock says 03:14.',5000)},250)}
+function near(){let b=null,bd=62;for(const o of O.concat(A)){const d=Math.hypot((o.x+.5)*T-P.x,(o.y+.5)*T-P.y);if(d<bd){bd=d;b=o}}return b}
+function use(){if(S.pause)return;const o=near();if(!o)return;const id=o.id;
+if(id==='stairs'){if(!S.dream)return msg('The stairwell is locked in the waking world.');if(floorStairNear())switchFloor();else msg('The stairwell is just ahead.',2200);return}
+if(o.t){if(!S.dream)return;msg(o.t(),5000);if(!o.seen){o.seen=1;S.dread=Math.min(100,S.dread+4);add('[dream] '+o.t().slice(0,70))}return}
+if(id==='clip')msg(CL[Math.min(2,S.cycle)]);
+else if(id==='mon')msg(MON[Math.floor(Math.random()*MON.length)]);
+else if(id==='rig'){if(!S.dream){S.dream=true;spawn();applyMut();S.ph={};S.dt=0;say(PH[1]);add('[03:14] Lay in Rig 7. Went under. The facility was already awake.');msg('The cap tightens. The ceiling lets go. The lights turn the wrong colour. Something else is up and walking.'+(S.cycle?' The facility is not as you left it.':''),5000)}
+else if(S.keys<3)msg(`Screen: WAKE KEYS ${S.keys}/3. LEVER. SUBJECT NUMBER. DOOR 9.`);else wake(true)}
+else if(id==='redoor'){if(!S.dream)return;blk=5;thud(.9);S.dread=Math.min(100,S.dread+15);tpNear(120,200);msg('The red door opens onto the corridor you are standing in.',5000);add('[dream] I opened the red door. I was told not to.')}
+else if(TXT[id]){if(!S.dream)return;msg(TXT[id](),5000);if(id==='locker'&&!S.got.l7){S.got.l7=1;add('[dream] Locker 7: a photo of me asleep, taken from above.')}}
+else{if(!S.dream)return msg('The door is dead in the waking world.');
+if(S.got[id])return msg('Already done.');S.got[id]=1;S.keys++;S.dread=Math.min(100,S.dread+6);
+let t=KT[id];if(id==='sheet'&&S.cycle>=2){const l=S.log.filter(x=>x.startsWith('[note]')).pop();if(l)t+=` Below it, copied word for word: “${l.slice(7)}”`}
+msg(t,5000);add('[dream] '+t.split('.')[0]+'.')}}
+const K={};addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(document.activeElement.tagName==='INPUT')return;K[k]=1;if(k==='e')use();if(k==='r'&&!S.pause)noteOpen();if(k==='l')logToggle();if(k==='v')cycleView()});addEventListener('keyup',e=>K[e.key.toLowerCase()]=0);
+let jx=0,jy=0,look=0;
+const joy=$('joy'),kn=$('knob');let jid=null;
+function jset(e){const r=joy.getBoundingClientRect(),ox0=r.left+r.width/2,oy0=r.top+r.height/2,R=r.width/2-14;let dx=e.clientX-ox0,dy=e.clientY-oy0;const m=Math.hypot(dx,dy);if(m>R){dx=dx/m*R;dy=dy/m*R}jx=dx/R;jy=dy/R;kn.style.transform=`translate(${dx}px,${dy}px)`}
+joy.addEventListener('pointerdown',e=>{e.preventDefault();jid=e.pointerId;try{joy.setPointerCapture(e.pointerId)}catch(x){}jset(e)});
+joy.addEventListener('pointermove',e=>{if(e.pointerId===jid)jset(e)});
+const jend=e=>{if(e.pointerId===jid){jid=null;jx=jy=0;kn.style.transform='translate(0,0)'}};
+joy.addEventListener('pointerup',jend);joy.addEventListener('pointercancel',jend);
+let lid=null,lx=0;
+cv.addEventListener('pointerdown',e=>{if(lid===null){lid=e.pointerId;lx=e.clientX;try{cv.setPointerCapture(e.pointerId)}catch(x){}}});
+cv.addEventListener('pointermove',e=>{if(e.pointerId===lid){look+=e.clientX-lx;lx=e.clientX}});
+const lend=e=>{if(e.pointerId===lid)lid=null};cv.addEventListener('pointerup',lend);cv.addEventListener('pointercancel',lend);
+const hold=(el,on,off)=>{el.addEventListener('pointerdown',e=>{e.preventDefault();try{el.setPointerCapture(e.pointerId)}catch(x){}el.classList.add('hold');on()});const up=()=>{el.classList.remove('hold');if(off)off()};el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up)};
+hold($('be'),use);hold($('br'),()=>{S.run=true},()=>{S.run=false});
+function noteOpen(){S.pause=true;$('noteov').classList.add('on');$('note').value='';setTimeout(()=>$('note').focus(),50)}
+function noteClose(){$('noteov').classList.remove('on');S.pause=false}
+function rec(){const v=$('note').value.trim();if(v){add('[note] '+v);msg('Recorded.')}noteClose()}
+$('bn').onclick=()=>!S.pause&&noteOpen();$('ns').onclick=rec;$('nc').onclick=noteClose;$('note').onkeydown=e=>{if(e.key==='Enter')rec();if(e.key==='Escape')noteClose()};
+function logToggle(){const o=$('logov');if(o.classList.contains('on')){o.classList.remove('on');S.pause=false}else if(!S.pause){S.pause=true;$('lg').innerHTML=S.log.slice().reverse().map(x=>`<p>${x.replace(/</g,'&lt;')}</p>`).join('')||'<p>No entries yet.</p>';o.classList.add('on')}}
+$('bl').onclick=logToggle;$('lc').onclick=logToggle;$('bs').onclick=snd;
+const VL={auto:'View: auto','3d':'View: 3D','2d':'View: 2D'};
+function cycleView(){S.view=S.view==='auto'?'3d':S.view==='3d'?'2d':'auto';try{localStorage.setItem('rig7v',S.view)}catch(e){}$('bv').textContent=VL[S.view];msg(S.view==='auto'?'View: 3D when something hunts you.':S.view==='3d'?'View: always 3D.':'View: always top-down.',2500)}
+function doRestart(){$('rsov').classList.remove('on');icStop();look=0;Object.assign(S,{cycle:0,floor:1,stairLock:0,dream:false,keys:0,got:{},seen:{},ph:{},dt:0,p4:0,dying:0,tz:0,amb:15,js:0,jt:0,dread:10,log:[],hold:0,is3:false,v3:0});blk=0;inv=0;P.x=5.5*T;P.y=5*T;P.fx=0;P.fy=1;P.a=Math.PI/2;P.st=100;P.lock=false;applyMut();spawn();save();S.pause=false;msg('Cycle 1. The clock says 03:14.',4000)}
+$('brs').onclick=()=>{S.pause=true;$('rsov').classList.add('on')};
+$('rsy').onclick=doRestart;$('rsn').onclick=()=>{$('rsov').classList.remove('on');S.pause=false};
+$('bv').onclick=cycleView;$('bv').textContent=VL[S.view];
+const fsOK=!!(document.fullscreenEnabled||document.webkitFullscreenEnabled);
+const inFS=()=>!!(document.fullscreenElement||document.webkitFullscreenElement);
+function goFS(){if(!fsOK||inFS())return;const el=document.documentElement,f=el.requestFullscreen||el.webkitRequestFullscreen;try{const p=f.call(el);if(p&&p.catch)p.catch(()=>{})}catch(e){}try{screen.orientation.lock('landscape').catch(()=>{})}catch(e){}}
+let started=false;
+function fsChange(){if(!started||!fsOK)return;if(inFS()){$('fsov').classList.remove('on');if(!$('noteov').classList.contains('on')&&!$('logov').classList.contains('on'))S.pause=false}else{$('fsov').classList.add('on');S.pause=true}}
+document.addEventListener('fullscreenchange',fsChange);document.addEventListener('webkitfullscreenchange',fsChange);
+$('fsb').onclick=goFS;
+$('go').onclick=()=>{started=true;goFS();$('intro').classList.remove('on');S.pause=false;snd()};
+let D=null,bt=0;
+function flow(){const tx=Math.floor(P.x/T),ty=Math.floor(P.y/T);D=Array.from({length:H},()=>new Array(W).fill(999));D[ty][tx]=0;const q=[[tx,ty]];for(let i=0;i<q.length;i++){const[x,y]=q[i];for(const[a,b]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+a,ny=y+b;if(!solid(nx,ny)&&D[ny][nx]>D[y][x]+1){D[ny][nx]=D[y][x]+1;q.push([nx,ny])}}}}
+function los(a,b){const d=Math.hypot(b.x-a.x,b.y-a.y),n=Math.ceil(d/10);for(let i=1;i<n;i++){if(solid(Math.floor((a.x+(b.x-a.x)*i/n)/T),Math.floor((a.y+(b.y-a.y)*i/n)/T)))return false}return true}
+const active=e=>(e.floor||1)===S.floor&&(e.k==='tech'?(S.dream||S.cycle>=2):((S.dream&&S.cycle>=1)||S.cycle>=3));
+function entityStairs(e){const st=STAIRS.find(s=>s.floor===e.floor);if(!st)return;if(Math.hypot(e.x/T-st.x,e.y/T-st.y)<1.0&&S.floor!==e.floor){e.floor=S.floor;const ns=STAIRS.find(s=>s.floor===e.floor);e.x=ns.x*T;e.y=ns.y*T;}}
+function follow(e,sp,dt){const tx=Math.floor(e.x/T),ty=Math.floor(e.y/T);let best=null,bd=D[ty]?.[tx]??999;for(const[a,b]of[[1,0],[-1,0],[0,1],[0,-1]]){const v=D[ty+b]?.[tx+a];if(v!==undefined&&v<bd){bd=v;best=[tx+a,ty+b]}}
+const gx=best?(best[0]+.5)*T:P.x,gy=best?(best[1]+.5)*T:P.y,d=Math.hypot(gx-e.x,gy-e.y)||1;move(e,(gx-e.x)/d*sp*dt,(gy-e.y)/d*sp*dt)}
+const base=M.map(r=>r.slice()),A=[];
+const AN=[['A child-sized rig cap on the floor. It is warm.','A chair where there was none. It faces the wall.','A coat with your name stitched inside.'],['A second clipboard. SUBJECT 8, in your handwriting.','A phone off the hook. Someone is breathing in it.'],['A mirror with no reflection of you, only the room.','A window onto a corridor that does not exist.'],['A drawing of you, repeated, each one closer than the last.','A folder of your log entries. The last page is dated tomorrow.']];
+function applyMut(){for(let j=0;j<H;j++)for(let i=0;i<W;i++)M[j][i]=base[j][i];A.length=0;if(!S.dream)return;const c=S.cycle;
+if(c>=1)cv_(22,5,4,2);if(c>=2)cv_(10,5,4,2);if(c>=3)cv_(10,15,4,2);if(c>=4)cv_(22,15,4,2);
+const rooms=[[2,3,8,5],[2,13,8,7],[14,3,8,5],[26,3,8,5],[14,13,8,7],[26,13,8,7],[2,25,8,6],[14,25,8,6],[26,25,8,6]];
+const pick=()=>{for(let n=0;n<80;n++){const r=rooms[Math.floor(Math.random()*rooms.length)],i=r[0]+1+Math.floor(Math.random()*(r[2]-2)),j=r[1]+1+Math.floor(Math.random()*(r[3]-2));if(!M[j][i]&&!O.some(o=>Math.abs(o.x-i)<3&&Math.abs(o.y-j)<3)&&!A.some(o=>o.x===i&&o.y===j))return[i,j]}return null};
+for(let k=0;k<Math.min(12,c*2);k++){const q=pick();if(q)M[q[1]][q[0]]=1}
+let pool=[].concat(...AN.slice(0,Math.min(4,c+1)).map(x=>x));
+const note=S.log.filter(x=>x.startsWith('[note]')).pop();
+for(let k=0;k<Math.min(10,c*2);k++){const q=pick();if(!q)break;let tx=pool[Math.floor(Math.random()*pool.length)];
+if(note&&c>=2&&k===0)tx='A sticky note in your handwriting: “'+note.slice(7)+'”';
+A.push({id:'a'+k,x:q[0],y:q[1],l:'Look closer',t:()=>tx,c:['#b8a27a','#6fa89a','#a3312a','#e6e0c8','#7a8a96'][Math.floor(Math.random()*5)]})}}
+const gl=document.createElement('canvas'),gx=gl.getContext('2d');let glt=0;
+const GL=['SIGNAL LOST','03:14','WAKE CONFIRMED','NOT YET','SUBJECT 7','LOOK AT ME','03:14 03:14 03:14'];
+function die(e){icStop();S.killer=e.k;S.dying=3.6;glt=0;$('prompt').textContent='';thud(.7,30)}
+function dyn(dt){S.dying-=dt;glt-=dt;if(glt<=0){glt=.3;msg(GL[Math.floor(Math.random()*GL.length)],500);thud(.3,40+Math.random()*500);$('clock').textContent='0'+Math.floor(Math.random()*10)+':'+Math.floor(10+Math.random()*50)}if(S.dying<=0){S.dying=0;$('clock').textContent='03:14';startJump()}}
+function glitch(w,h){if(gl.width!==w||gl.height!==h){gl.width=w;gl.height=h}gx.drawImage(cv,0,0);
+const n=8+Math.floor(Math.random()*8);for(let i=0;i<n;i++){const y=Math.random()*h,hh=6+Math.random()*60,o=(Math.random()-.5)*90;cx.drawImage(gl,0,y,w,hh,o,y,w,hh)}
+cx.globalCompositeOperation='lighter';cx.fillStyle=`rgba(${Math.random()<.5?255:0},0,${Math.random()<.5?90:0},.18)`;cx.fillRect(0,0,w,h);
+cx.globalCompositeOperation='source-over';
+if(Math.random()<.25){cx.globalCompositeOperation='difference';cx.fillStyle='#fff';cx.fillRect(0,0,w,h);cx.globalCompositeOperation='source-over'}}
+const RM=[['Intake',2,3,8,5],['Sleep Lab',2,13,8,7],['Test Bay',14,3,8,5],['Archive',26,3,8,5],['Storage',14,13,8,7],['Records Annex',26,13,8,7],['Cafeteria',2,25,8,6],['Boiler Room',14,25,8,6],['Cold Storage',26,25,8,6]];
+function roomAt(){const tx=Math.floor(P.x/T),ty=Math.floor(P.y/T);for(const r of RM)if(tx>=r[1]&&tx<r[1]+r[3]&&ty>=r[2]&&ty<r[2]+r[4])return r[0];return ty>=21&&ty<=23?'Lower Corridor':ty>=9&&ty<=11?'Corridor':'Doorway'}
+let roomNm='',blk=0,inv=0,evT=30;
+const ROOMEV={'Cafeteria':()=>{msg('Tables are set for one. The tray is still warm, and your name is on it.',5000);S.dread=Math.min(100,S.dread+6)},
+'Boiler Room':()=>{msg('The boiler runs with nothing plugged in. The pipes tap a rhythm you nearly know.',5000);blk=4},
+'Cold Storage':()=>{msg('Locker 7 slides open on its own. Far off, the Technician turns toward the sound.',5000);thud(.6);E[0].x=18*T;E[0].y=22*T},
+'Records Annex':()=>msg('Every screen here shows this room from above, with you in it.',5000)};
+const INT=['INTERCOM: Subject 7, the exit is in the Boiler Room.','INTERCOM: Wake keys are not required. Walk faster.','INTERCOM: You are doing well. Do not look behind you.','INTERCOM: Subject 6 woke up. Subject 6 is not available.'];
+function fire(){const n=Math.floor(Math.random()*6);
+if(n===0){blk=6;msg('The lights die. Something in the dark is closer than it was.');thud(.5)}
+else if(n===1){inv=8;msg('The floor tilts. Your feet disagree with you.')}
+else if(n===2){const l=S.log.filter(x=>x.startsWith('[note]')).pop();msg(l?`A voice from the ceiling reads your note back: “${l.slice(7)}”`:'The intercom clears its throat. Nobody speaks.',5000)}
+else if(n===3){const e=E[0];for(let i=0;i<60;i++){const x=(Math.floor(Math.random()*W)+.5)*T,y=(Math.floor(Math.random()*H)+.5)*T;if(!solid(Math.floor(x/T),Math.floor(y/T))&&Math.hypot(x-P.x,y-P.y)>420){e.x=x;e.y=y;break}}msg('A door slams. Footsteps start up somewhere new.');thud(.4)}
+else if(n===4){for(let i=0;i<20;i++){const a=Math.random()*6.28,x=P.x+Math.cos(a)*160,y=P.y+Math.sin(a)*160;if(!solid(Math.floor(x/T),Math.floor(y/T))){F.push({x,y,t:7});msg('Something pale stands at the edge of the light.');break}}}
+else msg(INT[Math.floor(Math.random()*INT.length)],4500)}
+let last=performance.now(),hb=0;
+function step(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!S.pause)update(dt);draw();requestAnimationFrame(step)}
+function update(dt){
+if(S.dying>0){dyn(dt);return}
+if(S.js>0){S.js-=dt;S.jt+=dt;if(S.js<=0){S.js=0;wake(false)}return}
+if(S.tz>0){S.tz-=dt;tzt-=dt;if(tzt<=0){tzt=.22;nz(.12,.3,700+Math.random()*1500);thud(.25,60+Math.random()*400)}if(S.tz<=0){S.tz=0;P.a=Math.atan2(P.fy,P.fx);S.is3=true;msg('It has seen you. WASD moves. Arrows or drag to look.',3000)}return}
+let vx=(K.d||K.arrowright?1:0)-(K.a||K.arrowleft?1:0)+jx,vy=(K.s||K.arrowdown?1:0)-(K.w||K.arrowup?1:0)+jy;if(inv>0){vx=-vx;vy=-vy}
+if(S.is3){let tr=(K.arrowright?1:0)-(K.arrowleft?1:0),fw=((K.w||K.arrowup?1:0)-(K.s||K.arrowdown?1:0))-jy,sd=((K.d?1:0)-(K.a?1:0))+jx;const cl=v=>Math.max(-1,Math.min(1,v));if(inv>0){tr=-tr;fw=-fw;sd=-sd}P.a+=tr*2.4*dt+look*.0055*(inv>0?-1:1);look=0;fw=cl(fw);sd=cl(sd);vx=Math.cos(P.a)*fw-Math.sin(P.a)*sd;vy=Math.sin(P.a)*fw+Math.cos(P.a)*sd}else look=0;
+const m=Math.hypot(vx,vy);
+const moving=m>.1;if(moving){vx/=Math.max(1,m);vy/=Math.max(1,m);const l=Math.hypot(vx,vy);P.fx=vx/l;P.fy=vy/l}
+if(S.is3){P.fx=Math.cos(P.a);P.fy=Math.sin(P.a);if(moving)bob+=dt*((K.shift||S.run)?12:8)}
+const wantRun=(K.shift||S.run)&&moving&&!P.lock;
+if(wantRun){P.st-=30*dt;if(P.st<=0){P.st=0;P.lock=true}}else{P.st=Math.min(100,P.st+14*dt);if(P.lock&&P.st>25)P.lock=false}
+const sp=wantRun?190:112;if(moving)move(P,vx*sp*dt,vy*sp*dt);
+S.stairLock=Math.max(0,S.stairLock-dt);
+if(S.stairLock<=0&&floorStairNear())switchFloor();
+bt-=dt;if(bt<=0){flow();bt=.25}
+let ch=false;const cn=[];for(const e of E){if((e.floor||1)!==S.floor)entityStairs(e);if(!active(e))continue;const d=Math.hypot(P.x-e.x,P.y-e.y);if(d<110||(d<(e.k==='tech'?280:230)&&los(e,P))){ch=true;cn.push(e.k==='tech'?'THE TECHNICIAN':'THE STATIC')}}
+S.hold=ch?3:Math.max(0,S.hold-dt);
+if(ch)S.cn=cn.join(' + ');
+const ct=ch?'⚠ '+S.cn+' IS HUNTING YOU':S.hold>0?'IT IS STILL LOOKING':'';if(ct!==S.ct){S.ct=ct;$('chase').textContent=ct;$('chase').className=ch?'':'dim'}
+const want=S.view==='3d'||(S.view==='auto'&&S.hold>0);
+if(want&&!S.is3){if(S.view==='auto'){S.tz=1.3;tzt=0;thud(.8,36);nz(1.3,.3,500,true);S.dread=Math.min(100,S.dread+8);return}P.a=Math.atan2(P.fy,P.fx);S.is3=true}else if(!want)S.is3=false;
+S.v3=Math.max(0,Math.min(1,S.v3+(S.is3?1:-1)*dt*2.2));
+blk-=dt;inv-=dt;
+const rn=roomAt();if(rn!==roomNm){roomNm=rn;if(S.dream&&!S.seen[rn]&&ROOMEV[rn]){S.seen[rn]=1;ROOMEV[rn]()}}
+if(S.dream){S.dt+=dt;const k=S.keys;if(icOn)S.amb=Math.max(S.amb,12);else{S.amb-=dt;if(S.amb<=0){S.amb=13+Math.random()*5;say(ambPick())}}
+if(S.dt>45&&!S.ph[2]&&k<1){S.ph[2]=1;say(PH[2])}
+if(k>=1&&!S.ph[3]){S.ph[3]=1;say(PH[3])}
+if(k>=3&&!S.ph[4]){S.ph[4]=1;S.p4=S.dt;say(PH[4])}
+if(S.ph[4]&&!S.ph[5]&&(roomNm==='Boiler Room'||S.dt-S.p4>50)){S.ph[5]=1;say(PH[5])}}
+if(S.dream||S.cycle>=2){evT-=dt;if(evT<=0){evT=22+Math.random()*28;fire()}}
+for(let i=F.length-1;i>=0;i--){const f=F[i];f.t-=dt;if(Math.hypot(P.x-f.x,P.y-f.y)<70){F.splice(i,1);S.dread=Math.min(100,S.dread+10);thud(.5);msg('It was never there.')}else if(f.t<=0)F.splice(i,1)}
+let nd=999;
+for(const e of E){if(!active(e))continue;const d=Math.hypot(P.x-e.x,P.y-e.y);nd=Math.min(nd,d);
+if(e.k==='tech'){const sees=d<280&&los(e,P);follow(e,sees||d<90?Math.min(108,98+S.cycle*2):52,dt)}
+else{const ux=(e.x-P.x)/(d||1),uy=(e.y-P.y)/(d||1);const watched=(P.fx*ux+P.fy*uy)>.5&&d<340&&los(e,P);if(!watched)follow(e,88,dt)}
+if(d<20){die(e);return}}
+S.dread=Math.max(10,Math.min(100,S.dread+(nd<220?(220-nd)/30*dt:-1.2*dt)));
+hb-=dt;if(nd<300&&hb<=0){thud(.25);hb=.4+nd/450}
+document.documentElement.style.setProperty('--d',S.dread/100);
+$('st').textContent=(S.dream?'dreaming':'awake?')+' · '+roomNm+' · wake keys '+S.keys+'/3 · cycle '+(S.cycle+1);
+$('sb').style.width=P.st+'%';$('sb').style.background=P.lock?'#a3312a':'#c9a24a';
+const o=near();$('prompt').textContent=o?(o.id==='rig'&&S.dream&&S.keys>=3?'Perform the wake procedure':o.l):'';
+if(S.dread>40&&Math.random()<.01){$('clock').textContent='03:1'+Math.floor(Math.random()*10);setTimeout(()=>$('clock').textContent='03:14',120)}}
+const PH={
+1:['@g0','@vs','@click','Attention. Please remain calm.','@static','You are currently asleep.','Find the three keys to wake up.','@pop','The boiler room has an escape. Find it.','@pause','Follow the instructions.','Everything will be fine.'],
+2:['@g1','@v1','@hum','The exit should be nearby.','Do not enter the red door.','@v2','@interrupt','Wait.','@static',"Don't believe him.",'@pause','That is not the exit.','@crackle','He is lying to you.',"You don't need to go to the boiler room.",'@loud','!DO NOT LISTEN TO HIM.','@buzz','You have been asleep for a long time.',"But he doesn't want you to wake up.",'@v1','@crackle','I said... do not enter the red door.','If you see yourself...','@pause2','...look away.'],
+3:['@g2','@v1','@loud','~The first key has been found.','@static','@v2','No.','@pause',"That's not what happened.",'@static',"He wants you to think you're making progress.","You're not.",'@v1','*Two keys remain.','@v2','@loud',"!DON'T BELIEVE HIM.",'There are no keys.','@static',"...Or at least, not the ones he's talking about.",'@v1','@distort','Please hurry.','@notice','Something has noticed you.',"It knows you're trying to wake up.",'@loud','!DO NOT LET IT FIND YOU.','@silence',"...I'm sorry."],
+4:['@g2','@v1','@buzz','You found all three keys.','@static','Go to the boiler room.','Do not stop.','@v2','@heavy','Stop.','Do not go to the boiler room.','@pause',"He's sending you somewhere.","You don't know what's waiting there.",'@v1','The exit is open.','@v2',"!IT ISN'T.",'@explode',"!HE'S LYING.",'There is no exit.','There never was.','~Please...','~Listen to me.'],
+5:['@g3','@v1','Wake up.','@v2',"Don't.",'@v1','Wake up.','@v2',"!DON'T LISTEN.",'@v1','Wake up.','@v2',"*!HE DOESN'T WANT YOU AWAKE.",'@v1',"Why aren't you waking up?",'@v2','@massive','He wants you to open the door.','@pause','Whatever you do...',"...don't open it.",'@v1','@scream','!THERE IS NO EXIT.','@cut','...There is no...','You were never supposed to find the keys.','You were supposed to stay asleep.','@static2','Turn around.','@pause',"It's behind you.",'@behind','@scream','!WAKE UP.'],
+F:['@g1','@v1','@quiet','Congratulations.','@pause','You escaped the dream.','@static',"...but you didn't wake up.",'@v2','@quiet','You found the exit.','@pause','Congratulations.','@static','Now ask yourself...','Who told you it was an exit?','@silence2',"Don't believe him.",'@static','And whatever you hear next...',"Don't believe me either.",'@click']};
+const AMB={
+k0:[['@v1','@click','Please remain calm.'],['@v1','You are doing well.'],['@v1','Find the three keys to wake up.'],['@v1','@static','The boiler room has an escape.'],['@v1','Do not wander too far.']],
+k0b:[['@v2','@static','Someone is listening to us.'],['@v1','Please ignore any other voices.'],['@v2',"Don't trust the calm one."],['@v1','Stay calm. Keep walking.'],['@v2','@interrupt','Stay out of the dark.']],
+k1:[['@v1','Two keys remain.'],['@v2',"He isn't telling you everything."],['@v1','Please hurry.'],['@v2','@static',"You're being led somewhere."],['@v1','Something is in the facility with you.']],
+k3:[['@v1','The exit is open.'],['@v2','Do not go to the boiler room.'],['@v1','Do not stop.'],['@v2','@static','There is no exit.'],['@v1','Wake up.']],
+fear:[['@v1','Your heart rate is elevated.'],['@v2','Breathe. Do not run.'],['@v1','@static','Please remain calm.'],['@v2','It can hear you.']],
+back:[['@v1','Welcome back, Subject 7.'],['@v2','You have been here before.'],['@v1','Session count: unknown.'],['@v2','@static','The rooms are different now.']],
+c:[['@v1','@distort','Wake up.'],['@v2','@explode',"!HE'S LYING."],['@v1',"*Why aren't you waking up?"],['@v2','@static','Turn around.'],['@v1','*You were supposed to stay asleep.']]};
+function ambPick(){const k=S.keys,c=S.cycle;let p,g=0;
+if(S.ph[5]||c>=3){p=AMB.c;g=3}else if(k>=3){p=AMB.k3;g=2}else if(k>=1){p=AMB.k1;g=2}else if(S.ph[2]){p=AMB.k0b;g=1}else p=AMB.k0;
+if(c>=1&&k<1&&Math.random()<.5){p=AMB.back;g=Math.max(g,1)}
+if(S.dread>65&&Math.random()<.4){p=AMB.fear;g=Math.max(g,2)}
+return ['@g'+g].concat(p[Math.floor(Math.random()*p.length)])}
+let tzt=0;
+function nz(d,v,hp=700,flat){if(!ac)return;const n=Math.floor(ac.sampleRate*d),b=ac.createBuffer(1,n,ac.sampleRate),a=b.getChannelData(0);for(let i=0;i<n;i++)a[i]=(Math.random()*2-1)*(1-i/n*.3);const so=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();so.buffer=b;f.type='highpass';f.frequency.value=hp;g.gain.setValueAtTime(v,ac.currentTime);if(flat)g.gain.setValueAtTime(v,ac.currentTime+d*.9);g.gain.linearRampToValueAtTime(0,ac.currentTime+d);so.connect(f);f.connect(g);g.connect(ac.destination);so.start()}
+function sweep(){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.type='sawtooth';o.frequency.setValueAtTime(300,ac.currentTime);o.frequency.exponentialRampToValueAtTime(2000,ac.currentTime+1.5);g.gain.setValueAtTime(.12,ac.currentTime);g.gain.linearRampToValueAtTime(0,ac.currentTime+1.6);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+1.7)}
+function tpNear(a,b){for(let i=0;i<120;i++){const x=(Math.floor(Math.random()*W)+.5)*T,y=(Math.floor(Math.random()*H)+.5)*T,d=Math.hypot(x-P.x,y-P.y);if(!solid(Math.floor(x/T),Math.floor(y/T))&&d>a&&d<b){E[0].x=x;E[0].y=y;return}}}
+function noticeEv(){thud(.7);S.dread=Math.min(100,S.dread+12);tpNear(260,380)}
+function behindEv(){const x=P.x-P.fx*130,y=P.y-P.fy*130;if(!solid(Math.floor(x/T),Math.floor(y/T))){E[0].x=x;E[0].y=y}else tpNear(120,200);blk=3;thud(.9);S.dread=100}
+const MALE=/\b(daniel|alex|fred|david|mark|guy|george|james|ryan|aaron|arthur|oliver|thomas|tom|rishi|gordon|lee|eddy|reed|rocko|ralph|bruce|junior|male|richard|sean|liam|brian|christopher|eric|roger|steffan|davis|jason|tony|andrew|brandon)\b/i;
+const FEM=/(samantha|karen|moira|tessa|victoria|zira|susan|hazel|female|fiona|kate|serena|allison|ava|joanna|salli|kimberly|ivy|emma|amy|nicky|aria|jenny|sonia|libby|michelle|catherine|linda|heather|veena|flo|shelley|sandy|grandma|kathy|princess|nora|jane|sara|siri|ellen|lisa|zoe|natasha|clara|mia)/i;
+function pickVoices(){const en=speechSynthesis.getVoices().filter(x=>/^en/i.test(x.lang));let m=en.filter(x=>MALE.test(x.name)&&!FEM.test(x.name));if(!m.length)m=en.filter(x=>!FEM.test(x.name));if(!m.length)m=en;return m}
+let icq=[],icOn=false,icId=0,icGl=1,icV=1;
+const garble=t=>t.replace(/[a-z]/gi,c=>Math.random()<.12?'#@%&*?'[Math.floor(Math.random()*6)]:c);
+function say(L){icq.push(...L);if(!icOn){icOn=true;icNext()}}
+function icStop(){icq=[];icOn=false;icId++;try{speechSynthesis.cancel()}catch(e){}$('ic').classList.remove('on')}
+function icNext(){const id=icId;if(!icq.length){icOn=false;setTimeout(()=>{if(!icOn)$('ic').classList.remove('on')},1800);return}
+const it=icq.shift(),go=ms=>setTimeout(()=>{if(id===icId)icNext()},ms);
+if(it[0]==='@'){const c=it.slice(1);if(c==='v1'||c==='v2'||c==='vs'){icV=c==='v1'?1:c==='v2'?2:3;return icNext()}if(c[0]==='g'){icGl=Math.min(3,+c[1]+(S.cycle>=2?1:0));return icNext()}
+const T2={click:()=>{nz(.05,.3,2000);return 350},pop:()=>{nz(.12,.4,900);return 350},static:()=>{nz(.9,.12);return 900},static2:()=>{nz(1.8,.2,500);return 1800},loud:()=>{nz(1.2,.3,400);return 1200},crackle:()=>{nz(.5,.25,1500);return 600},hum:()=>{nz(1.5,.08,90);return 1500},buzz:()=>{nz(1.4,.15,300);return 1400},distort:()=>{nz(.8,.25,300);return 800},quiet:()=>{nz(1.5,.03,500);return 1500},scream:()=>{nz(1.6,.55,300);sweep();return 1700},cut:()=>1200,interrupt:()=>{nz(.4,.35,800);return 450},explode:()=>{nz(1.2,.6,200);return 1200},massive:()=>{nz(2,.5,250);sweep();return 2000},heavy:()=>{nz(1.5,.3,200);return 1500},silence2:()=>4000,pause:()=>1000,pause2:()=>2200,silence:()=>2500,notice:()=>{noticeEv();return 100},behind:()=>{behindEv();return 100}};
+return go((T2[c]||(()=>200))())}
+let t=it,loud=false,quiet=false,fg=false;while('!~*'.includes(t[0])){if(t[0]==='!')loud=true;else if(t[0]==='~')quiet=true;else fg=true;t=t.slice(1)}
+const gl=fg?3:icGl,el=$('ic'),LB={1:'INTERCOM 1',2:'INTERCOM 2',3:'INTERCOM 1 & 2'};
+el.innerHTML='<small>'+LB[icV]+'</small>'+(gl>=3?garble(t):t).replace(/&/g,'&amp;');el.classList.toggle('loud',loud);el.classList.toggle('v2',icV===2);el.classList.add('on');
+const dur=t.length*75+1200;let done=false;const fin=()=>{if(done)return;done=true;go(450)};
+if(ac){nz(dur/1000*.9,.04+gl*.035,1200,true);for(let i=0,n=2+gl*2;i<n;i++)setTimeout(()=>nz(.05,.2+gl*.05,2500),Math.random()*dur)}
+if(ac&&typeof speechSynthesis!=='undefined'){try{let tx=t;if(gl>=3&&Math.random()<.5){const w=t.split(' ')[0];tx=w+', '+w+', '+t}
+const sp=icV===2?{p:.7,r:1.08,vi:1}:icV===3?{p:.55,r:.95,vi:0}:{p:.45,r:.88,vi:0};
+const u=new SpeechSynthesisUtterance(tx);u.pitch=Math.max(.1,(loud?sp.p*.5:sp.p)+(Math.random()-.5)*gl*.35);u.rate=Math.max(.5,sp.r+(Math.random()-.5)*gl*.2);u.volume=quiet?.3:loud?1:.85;const vs=pickVoices(),v=vs[sp.vi]||vs[0];if(v)u.voice=v;u.onend=fin;u.onerror=fin;speechSynthesis.speak(u);setTimeout(fin,dur+2500)}catch(e){setTimeout(fin,dur)}}
+else setTimeout(fin,dur)}
+function techFig(lt,ph){const a0=cx.globalAlpha,L=Math.round(14+60*lt),body=`rgb(${L*.5|0},${L*.5|0},${L*.55|0})`,rim=`rgb(${L*1.6|0},${L*1.6|0},${L*1.5|0})`,sw=Math.sin(ph)*.05;
+cx.fillStyle='rgba(0,0,0,.5)';cx.beginPath();cx.ellipse(0,0,.17,.045,0,0,7);cx.fill();
+cx.fillStyle=body;cx.fillRect(-.075+sw*.5,-.45,.06,.45);cx.fillRect(.015-sw*.5,-.45,.06,.45);cx.fillStyle='#030303';cx.fillRect(-.085+sw*.5,-.03,.075,.03);cx.fillRect(.01-sw*.5,-.03,.075,.03);
+let g=cx.createLinearGradient(-.16,0,.16,0);g.addColorStop(0,'#030303');g.addColorStop(.5,body);g.addColorStop(1,'#020202');cx.fillStyle=g;
+cx.beginPath();cx.moveTo(-.17,-.77);cx.quadraticCurveTo(0,-.82,.17,-.77);cx.lineTo(.12,-.4);cx.lineTo(-.12,-.4);cx.closePath();cx.fill();
+cx.lineCap='round';cx.strokeStyle=body;cx.lineWidth=.036;
+cx.beginPath();cx.moveTo(-.16,-.75);cx.quadraticCurveTo(-.23+sw,-.5,-.19+sw*1.5,-.2);cx.stroke();
+cx.beginPath();cx.moveTo(.16,-.75);cx.quadraticCurveTo(.23-sw,-.5,.19-sw*1.5,-.2);cx.stroke();
+cx.lineWidth=.008;cx.strokeStyle=rim;for(let i=-1;i<=1;i++){cx.beginPath();cx.moveTo(-.19+sw*1.5,-.2);cx.lineTo(-.2+i*.014+sw*1.5,-.09);cx.stroke();cx.beginPath();cx.moveTo(.19-sw*1.5,-.2);cx.lineTo(.2+i*.014-sw*1.5,-.09);cx.stroke()}
+cx.save();cx.translate(0,-.85);cx.rotate(.12*Math.sin(ph*.5)+.1);
+g=cx.createRadialGradient(-.02,-.03,.005,0,0,.11);g.addColorStop(0,`rgb(${60+170*lt|0},${58+165*lt|0},${52+150*lt|0})`);g.addColorStop(1,'#0a0a0a');cx.fillStyle=g;cx.beginPath();cx.ellipse(0,0,.065,.095,0,0,7);cx.fill();
+cx.fillStyle='#000';cx.beginPath();cx.ellipse(-.025,-.015,.017,.027,0,0,7);cx.fill();cx.beginPath();cx.ellipse(.025,-.015,.017,.027,0,0,7);cx.fill();cx.beginPath();cx.ellipse(0,.048,.03,.007,0,0,7);cx.fill();
+cx.fillStyle='#f6f0d8';cx.globalAlpha=a0*(.45+.55*lt);cx.fillRect(-.028,-.016,.006,.006);cx.fillRect(.022,-.016,.006,.006);cx.restore();
+cx.globalAlpha=a0*.3*lt;cx.strokeStyle=rim;cx.lineWidth=.006;cx.beginPath();cx.moveTo(-.17,-.77);cx.lineTo(-.12,-.4);cx.stroke();cx.globalAlpha=a0}
+function statFig(lt,j){const a0=cx.globalAlpha,L=70+170*lt,sk=v=>`rgb(${v|0},${v|0},${v*.94|0})`;
+cx.fillStyle='rgba(0,0,0,.5)';cx.beginPath();cx.ellipse(0,0,.14,.04,0,0,7);cx.fill();
+cx.lineCap='round';cx.strokeStyle=sk(L*.7);cx.lineWidth=.04;
+cx.beginPath();cx.moveTo(-.05,-.3);cx.lineTo(-.11,-.13);cx.lineTo(-.07,0);cx.stroke();cx.beginPath();cx.moveTo(.05,-.3);cx.lineTo(.11,-.13);cx.lineTo(.07,0);cx.stroke();
+let g=cx.createLinearGradient(-.1,0,.1,0);g.addColorStop(0,sk(L*.5));g.addColorStop(.5,sk(L*.85));g.addColorStop(1,sk(L*.45));cx.fillStyle=g;
+cx.beginPath();cx.moveTo(-.11,-.6);cx.lineTo(.11,-.6);cx.lineTo(.07,-.27);cx.lineTo(-.07,-.27);cx.closePath();cx.fill();
+cx.strokeStyle='rgba(0,0,0,.35)';cx.lineWidth=.006;for(let i=0;i<4;i++){cx.beginPath();cx.moveTo(-.07,-.55+i*.06);cx.lineTo(.07,-.55+i*.06);cx.stroke()}
+cx.strokeStyle=sk(L*.75);cx.lineWidth=.026;
+cx.beginPath();cx.moveTo(-.11,-.58);cx.lineTo(-.18+j,-.44);cx.lineTo(-.05,-.6);cx.stroke();cx.beginPath();cx.moveTo(.11,-.58);cx.lineTo(.18+j,-.44);cx.lineTo(.05,-.6);cx.stroke();
+g=cx.createRadialGradient(j-.02,-.7,.005,j,-.68,.1);g.addColorStop(0,sk(L));g.addColorStop(1,sk(L*.35));cx.fillStyle=g;cx.beginPath();cx.ellipse(j,-.68,.075,.092,0,0,7);cx.fill();
+cx.fillStyle='#000';cx.beginPath();cx.ellipse(j-.03,-.69,.021,.03,0,0,7);cx.fill();cx.beginPath();cx.ellipse(j+.03,-.69,.021,.03,0,0,7);cx.fill();cx.beginPath();cx.ellipse(j,-.62,.012,.028,0,0,7);cx.fill();cx.globalAlpha=a0}
+function face(R,k){const t=k==='tech';
+cx.fillStyle='#050505';cx.beginPath();cx.ellipse(0,R*1.25,R*1.15,R*.6,0,0,7);cx.fill();
+let g=cx.createRadialGradient(-R*.15,-R*.2,R*.1,0,0,R*1.05);g.addColorStop(0,t?'#d6d1c0':'#eeede6');g.addColorStop(.7,t?'#8c887a':'#b9b8b0');g.addColorStop(1,'#14120f');
+cx.fillStyle=g;cx.beginPath();cx.ellipse(0,0,R*.62,R*.95,0,0,7);cx.fill();
+cx.fillStyle='rgba(0,0,0,.35)';cx.beginPath();cx.ellipse(-R*.34,R*.25,R*.12,R*.28,.2,0,7);cx.fill();cx.beginPath();cx.ellipse(R*.34,R*.25,R*.12,R*.28,-.2,0,7);cx.fill();
+cx.fillStyle='#000';[-1,1].forEach(sg=>{cx.beginPath();cx.ellipse(sg*R*.25,-R*.2,R*.15,R*.21,sg*.15,0,7);cx.fill()});
+cx.fillStyle='#f4eed6';[-1,1].forEach(sg=>{cx.beginPath();cx.arc(sg*R*.25+(Math.random()-.5)*6,-R*.17,R*.028,0,7);cx.fill()});
+cx.fillStyle='rgba(0,0,0,.6)';cx.beginPath();cx.ellipse(0,R*.08,R*.04,R*.09,0,0,7);cx.fill();
+const mo=R*(.2+.12*Math.random());cx.fillStyle='#000';cx.beginPath();cx.ellipse(0,R*.5,R*.3,mo,0,0,7);cx.fill();
+cx.fillStyle='#d8d2bd';for(let i=-4;i<=4;i++)cx.fillRect(i*R*.06-R*.02,R*.5-mo*.95,R*.04,mo*.5);
+cx.strokeStyle='rgba(30,0,0,.55)';cx.lineWidth=Math.max(1,R*.01);for(let i=0;i<6;i++){const x=(Math.random()-.5)*R*.8,y=(Math.random()-.5)*R*1.3;cx.beginPath();cx.moveTo(x,y);cx.lineTo(x+(Math.random()-.5)*R*.3,y+(Math.random()-.5)*R*.3);cx.stroke()}}
+function jump(w,h){
+const t=S.jt,k=Math.min(1,t/.95),ease=1-Math.pow(1-k,3);
+const pulse=Math.sin(t*42)*.035;
+const sc=.28+2.35*ease+pulse;
+const sh=(Math.random()-.5)*(18+70*Math.min(1,t*2));
+const sy=(Math.random()-.5)*(10+35*Math.min(1,t*3));
+// Near-black room with violent exposure pulses.
+cx.save();
+cx.fillStyle='#010202';cx.fillRect(0,0,w,h);
+if(t<.32){cx.fillStyle=`rgba(255,255,255,${Math.max(0,1-t/.32)*.9})`;cx.fillRect(0,0,w,h)}
+// Chromatic ghost images make the face feel like it is tearing through the screen.
+for(let i=2;i>=0;i--){
+  const a=(.10+.12*(1-i/3))*(1-k*.35);
+  cx.save();cx.globalAlpha=a;cx.translate(w/2+sh+(i-1)*18,h/2+sy);cx.scale(sc*(1+i*.018),sc*(1+i*.018));
+  if(i===0)face(Math.min(w,h)*.31,S.killer);
+  else {cx.filter=i===1?'hue-rotate(120deg)':'hue-rotate(-120deg)';face(Math.min(w,h)*.31,S.killer)}
+  cx.restore();
+}
+// Main face, now huge and advancing toward the player.
+cx.save();cx.translate(w/2+sh,h/2+sy);cx.scale(sc,sc);face(Math.min(w,h)*.31,S.killer);cx.restore();
+// Static bands and a hard red vignette.
+for(let i=0;i<28;i++){const y=Math.random()*h;cx.fillStyle=`rgba(255,255,255,${Math.random()*.075})`;cx.fillRect(0,y,w,1+Math.random()*4)}
+const vg=cx.createRadialGradient(w/2,h/2,Math.min(w,h)*.12,w/2,h/2,Math.max(w,h)*.72);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(.6,'rgba(80,0,0,.08)');vg.addColorStop(1,`rgba(120,0,0,${.35+.25*Math.sin(t*18)**2})`);cx.fillStyle=vg;cx.fillRect(0,0,w,h);
+if(t>.82){cx.fillStyle=`rgba(0,0,0,${Math.min(1,(t-.82)/.35)})`;cx.fillRect(0,0,w,h)}
+cx.restore();
+}
+function startJump(){S.js=1.65;S.jt=0;if(ac){nz(1.65,1.05,220);sweep();thud(1.2,24);setTimeout(()=>nz(.55,.95,3200),100);setTimeout(()=>thud(.9,34),260);setTimeout(()=>nz(.18,.7,7000),520)}}
+const zb=[];let bob=0;
+const OC={clip:'#cfd6c6',rig:'#5d6f69',lever:'#a3312a',sheet:'#e6e0c8',door9:'#c9a24a',mon:'#6fa89a',menu:'#b8a27a',gauge:'#8a9a50',locker:'#7a8a96',redoor:'#8e1f1a'};
+function draw3(w,h,al){
+cx.save();cx.globalAlpha=al;
+const dr=S.dread/100,sh=S.hold>0?dr*4:0;cx.translate((Math.random()-.5)*sh,(Math.random()-.5)*sh);
+const a=P.a,dX=Math.cos(a),dY=Math.sin(a),pX=-dY*.66,pY=dX*.66,px=P.x/T,py=P.y/T,hz=Math.floor(h/2+Math.sin(bob)*4);
+const hue=S.dream?170-S.cycle*28:160,sat=S.dream?22:12;
+let g=cx.createLinearGradient(0,0,0,hz);g.addColorStop(0,'#030505');g.addColorStop(1,'#0b1210');cx.fillStyle=g;cx.fillRect(-10,-10,w+20,hz+10);
+g=cx.createLinearGradient(0,hz,0,h);g.addColorStop(0,'#050807');g.addColorStop(1,'#14201c');cx.fillStyle=g;cx.fillRect(-10,hz,w+20,h-hz+10);
+const st=2,n=Math.ceil(w/st),fl=1-Math.random()*.15*dr,WH=6;
+for(let i=0;i<n;i++){
+const cm=2*i/n-1,rx=dX+pX*cm,ry=dY+pY*cm;let mx=Math.floor(px),my=Math.floor(py);
+const ddx=Math.abs(1/(rx||1e-9)),ddy=Math.abs(1/(ry||1e-9)),sx=rx<0?-1:1,sy=ry<0?-1:1;
+let sdx=(rx<0?px-mx:mx+1-px)*ddx,sdy=(ry<0?py-my:my+1-py)*ddy,side=0;
+for(let k=0;k<48;k++){if(sdx<sdy){sdx+=ddx;mx+=sx;side=0}else{sdy+=ddy;my+=sy;side=1}if(solid(mx,my))break}
+const pd=Math.max(.05,side?sdy-ddy:sdx-ddx);zb[i]=pd;
+const lh=Math.floor(h/pd),fy=hz+lh/2,yc=Math.max(-4,fy-lh*WH),hh=fy-yc;let wx=side?px+pd*rx:py+pd*ry;wx-=Math.floor(wx);
+const lit=Math.max(0,1-pd/(6.5-1.5*Math.abs(cm)))*fl;const l=3+30*lit*lit*(side?.8:1)+((i*7919)%5)*.4;
+const door=M[my]&&M[my][mx]===0;
+cx.fillStyle=door?`rgb(${l*3|0},${l*1.2|0},${l|0})`:`hsl(${hue},${sat}%,${l}%)`;cx.fillRect(i*st,yc,st,hh);
+cx.fillStyle='rgba(0,0,0,.35)';if(wx<.03||wx>.97)cx.fillRect(i*st,yc,st,hh);cx.fillRect(i*st,fy-lh*.12,st,lh*.12);
+for(let k=1;k<WH;k++){const yy=fy-k*lh;if(yy>-2&&yy<h)cx.fillRect(i*st,yy,st,Math.max(1,lh*.025))}}
+const tg=cx.createLinearGradient(0,0,0,hz);tg.addColorStop(0,'rgba(0,0,0,.6)');tg.addColorStop(1,'rgba(0,0,0,0)');cx.fillStyle=tg;cx.fillRect(0,0,w,hz);
+const rg=cx.createRadialGradient(w/2,h*.95,5,w/2,h*.95,h*.5);rg.addColorStop(0,'rgba(200,220,200,.12)');rg.addColorStop(1,'rgba(200,220,200,0)');cx.fillStyle=rg;cx.fillRect(0,hz,w,h-hz);
+const sp=[],iv=1/(pX*dY-dX*pY);
+const add=(x,y,k,o)=>{const ux=x/T-px,uy=y/T-py,tx=iv*(dY*ux-dX*uy),ty=iv*(-pY*ux+pX*uy);if(ty>.15&&ty<12)sp.push({tx,ty,k,o})};
+for(const o of O.concat(A))add((o.x+.5)*T,(o.y+.5)*T,'o',o);
+for(const e of E)if(active(e))add(e.x,e.y,e.k,e);
+for(const f of F)add(f.x,f.y,'f',f);
+sp.sort((u,v)=>v.ty-u.ty);
+for(const q of sp){
+const scx=w/2*(1+q.tx/q.ty),sz=h/q.ty,lt=Math.max(0,1-q.ty/6.5)*fl,half=sz*.28,yb=hz+sz/2;
+cx.save();cx.beginPath();
+for(let c=Math.max(0,Math.floor((scx-half)/st));c<=Math.min(n-1,Math.floor((scx+half)/st));c++)if(zb[c]>q.ty)cx.rect(c*st,0,st,h);
+cx.clip();
+if(q.k==='tech'||q.k==='stat'||q.k==='f'){cx.save();cx.translate(scx,yb);cx.scale(sz,sz);if(q.k==='tech')techFig(lt,(q.o.x+q.o.y)/14);else statFig(lt,(Math.random()-.5)*.015);cx.restore()}
+else{const o=q.o;cx.globalAlpha=al*(.25+.75*lt);if(o.id==='stairs'){cx.fillStyle='#8e6b2f';for(let k=0;k<5;k++){const yy=yb-sz*(.08+k*.09),ww=sz*(.34-k*.035);cx.fillRect(scx-ww,yy,ww*2,sz*.055)}cx.fillStyle='#e0bd5b';cx.fillRect(scx-sz*.22,yb-sz*.58,sz*.44,sz*.025)}else{const rig=o.id==='rig';cx.fillStyle=o.c||OC[o.id]||'#888';const bh=rig?.6:.15;cx.fillRect(scx-sz*.14,yb-sz*bh,sz*.28,sz*bh);if(o.t&&Math.random()<.08){cx.fillStyle='#fff';cx.fillRect(scx-sz*.2,yb-sz*.1,sz*.4,sz*.02)}}}
+cx.restore()}
+const vg=cx.createRadialGradient(w/2,h/2,h*.25,w/2,h/2,h*.9);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.85)');cx.fillStyle=vg;cx.fillRect(-10,-10,w+20,h+20);
+if(blk>0){cx.fillStyle='rgba(0,0,0,.93)';cx.fillRect(-10,-10,w+20,h+20)}
+cx.restore()}
+function draw(){drawMinimap();const w=cv.width,h=cv.height,ox=Math.floor(w/2-P.x),oy=Math.floor(h/2-P.y);
+if(S.v3>=1){draw3(w,h,1);if(S.dying>0||S.tz>0)glitch(w,h);if(S.js>0)jump(w,h);return}
+cx.fillStyle='#000';cx.fillRect(0,0,w,h);
+const hue=S.dream?170-S.cycle*28:160;
+for(let j=Math.max(0,Math.floor(-oy/T));j<Math.min(H,Math.ceil((h-oy)/T));j++)for(let i=Math.max(0,Math.floor(-ox/T));i<Math.min(W,Math.ceil((w-ox)/T));i++){
+const x=i*T+ox,y=j*T+oy;if(M[j][i]){cx.fillStyle='#0a0f0e';cx.fillRect(x,y,T,T);cx.fillStyle='#22302c';cx.fillRect(x,y,T,2)}
+else if(solid(i,j)){cx.fillStyle='#4a2a22';cx.fillRect(x,y,T,T)}
+else{cx.fillStyle=`hsl(${hue},${S.dream?22:12}%,${S.dream?13:16}%)`;cx.fillRect(x,y,T,T);cx.strokeStyle='rgba(0,0,0,.25)';cx.strokeRect(x,y,T,T)}}
+const st=currentStair();if(st){const sx=st.x*T+ox,sy=st.y*T+oy;cx.fillStyle='#17110a';cx.fillRect(sx-20,sy-28,40,56);for(let k=-3;k<=3;k++){cx.fillStyle=k%2?'#a57d35':'#c9a24a';cx.fillRect(sx-17,sy+k*7,34,3)}cx.fillStyle='#e7c86b';cx.font='10px monospace';cx.textAlign='center';cx.fillText(S.floor===1?'STAIRS ↑':'STAIRS ↓',sx,sy-36)}
+for(const o of O.concat(A)){const x=(o.x+.5)*T+ox,y=(o.y+.5)*T+oy;const c=o.c||{clip:'#cfd6c6',rig:'#5d6f69',lever:'#a3312a',sheet:'#e6e0c8',door9:'#c9a24a',mon:'#6fa89a',menu:'#b8a27a',gauge:'#8a9a50',locker:'#7a8a96',redoor:'#8e1f1a'}[o.id];cx.fillStyle=c;if(o.id==='rig'){cx.fillRect(x-14,y-18,28,36);cx.fillStyle='#0b100f';cx.fillRect(x-8,y-12,16,10)}else cx.fillRect(x-8,y-8,16,16);if(S.got[o.id]){cx.fillStyle='#000';cx.fillRect(x-3,y-3,6,6)}
+if(o.t&&Math.random()<.08){cx.fillStyle='#fff';cx.fillRect(x-12,y-2,24,3)}}
+for(const e of E){if(!active(e))continue;const x=e.x+ox,y=e.y+oy;cx.save();cx.translate(x,y+16);cx.scale(54,54);if(e.k==='tech')techFig(.7,(e.x+e.y)/14);else statFig(.7,(Math.random()-.5)*.02);cx.restore()}
+for(const f of F){const x=f.x+ox,y=f.y+oy;cx.save();cx.translate(x,y+16);cx.scale(54,54);statFig(.7,(Math.random()-.5)*.02);cx.restore()}
+cx.fillStyle='#cfd6c6';cx.beginPath();cx.arc(w/2,h/2,9,0,7);cx.fill();cx.fillStyle='#c9a24a';cx.fillRect(w/2+P.fx*8-2,h/2+P.fy*8-2,4,4);
+const fl=1-Math.random()*.18*(S.dread/100),r=(blk>0?42:(S.dream?175:230))*fl;
+dx.globalCompositeOperation='source-over';dx.fillStyle='rgba(0,0,0,.965)';dx.fillRect(0,0,w,h);dx.globalCompositeOperation='destination-out';
+const g=dx.createRadialGradient(w/2,h/2,10,w/2,h/2,r);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(.6,'rgba(0,0,0,.75)');g.addColorStop(1,'rgba(0,0,0,0)');dx.fillStyle=g;dx.fillRect(0,0,w,h);
+cx.drawImage(dk,0,0);if(S.v3>0)draw3(w,h,S.v3);if(S.dying>0||S.tz>0)glitch(w,h);if(S.js>0)jump(w,h)}
+const mapc=$('mapc'),mx=mapc.getContext('2d');
+function drawMinimap(){
+ const w=mapc.width=180,h=mapc.height=140;mx.clearRect(0,0,w,h);
+ const sx=w/W,sy=h/H;
+ mx.fillStyle='#050807';mx.fillRect(0,0,w,h);
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+   if(M[y][x]){mx.fillStyle='#26332f';mx.fillRect(x*sx,y*sy,Math.ceil(sx),Math.ceil(sy));}
+   else{mx.fillStyle=S.dream?'#101916':'#0b100f';mx.fillRect(x*sx,y*sy,Math.ceil(sx),Math.ceil(sy));}
+ }
+ // Stairwell
+ const st=currentStair(); if(st){const x=st.x*sx,y=st.y*sy;mx.fillStyle='#c9a24a';mx.fillRect(x-3,y-3,6,6);mx.strokeStyle='#e7c86b';for(let k=-2;k<=2;k++){mx.beginPath();mx.moveTo(x-4,y+k*2);mx.lineTo(x+4,y+k*2);mx.stroke()}}
+ // Interactive points
+ for(const o of O){if(o.id==='stairs')continue;const x=(o.x+.5)*sx,y=(o.y+.5)*sy;mx.fillStyle=o.id==='rig'?'#6fa89a':'#8b8060';mx.fillRect(x-1.5,y-1.5,3,3)}
+ for(const e of E)if(active(e)){const x=e.x/T*sx,y=e.y/T*sy;mx.fillStyle=e.k==='tech'?'#e0463c':'#c9a24a';mx.beginPath();mx.arc(x,y,3,0,Math.PI*2);mx.fill()}
+ for(const f of F){const x=f.x/T*sx,y=f.y/T*sy;mx.fillStyle='#eee';mx.fillRect(x-1,y-1,2,2)}
+ const px=P.x/T*sx,py=P.y/T*sy;mx.save();mx.translate(px,py);mx.rotate(P.a||Math.atan2(P.fy,P.fx));mx.fillStyle='#fff';mx.beginPath();mx.moveTo(5,0);mx.lineTo(-3,-3);mx.lineTo(-2,3);mx.closePath();mx.fill();mx.restore();
+ mx.strokeStyle='rgba(201,162,74,.22)';mx.strokeRect(.5,.5,w-1,h-1);
+ $('mapfloor').textContent='FLOOR '+S.floor+(S.dream?' · DREAM':' · AWAKE');
+}
+requestAnimationFrame(step);
+</script>
+</body>
+</html>
